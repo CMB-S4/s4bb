@@ -91,6 +91,9 @@ class MapDef():
         self.field = field.upper()
         self.bandpass = bandpass
 
+    def __str__(self):
+        return '{} (type: {})'.format(self.name, self.field)
+
 class XSpec():
     """
     The XSpec object is used for likelihood analysis using the set of auto and
@@ -102,4 +105,9 @@ class XSpec():
         self.maplist = maplist
         self.bpcov = bpcov
         self.bpwf = bpwf
-        
+
+    def __str__(self):
+        desc = '[XSpec object] {} maps:'.format(len(self.maplist))
+        for i in range(len(self.maplist)):
+            desc += ' {}'.format(self.maplist[i].name)
+        return desc
