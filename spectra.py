@@ -98,9 +98,8 @@ class XSpec():
     
     """
     
-    def __init__(self, maplist, ellbins, bpcov=None, bpwf=None):
+    def __init__(self, maplist, bpcov=None, bpwf=None):
         self.maplist = maplist
-        self.ellbins = ellbins
         self.bpcov = bpcov
         self.bpwf = bpwf
         
