@@ -78,6 +78,24 @@ def mapind(nspec, s0):
             break
     return (m0, m1)
 
+def specgen(nmap):
+    """
+    Generator function for iterating over spectra in vecp ordering.
+    
+    """
+
+    # Create lists of map ordering
+    m0 = []
+    m1 = []
+    for lag in range(nmap):
+        for i in range(nmap - lag):
+            m0.append(i)
+            m1.append(i + lag)
+    # Iterate through spectra
+    nspec = nmap * (nmap + 1) // 2
+    for i in range(nspec):
+        yield (i, m0[i], m1[i])
+
 class MapDef():
     """
     The MapDef object describes the properties of a map that is included in the
