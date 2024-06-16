@@ -41,6 +41,58 @@ class BPWF():
         self.bpwf = {}
         self.strict = strict
 
+    @classmethod
+    def tophat(cls, maplist, bin_edges, lmin=None, lmax=None, strict=False):
+        """
+        Creates BPWF object with tophat window functions defined by ell bin
+        edges.
+
+        Parameters
+        ----------
+        maplist : list of MapDef objects
+            The set of maps that define possible output spectra.
+        bin_edges : list of int
+            A list of bin edges for the tophat ell bins. The number of ell bins
+            will be one less than the number of entries in this list.
+        lmin : int, optional
+            The minimum ell value over which to define window functions.
+            Default behavior is to use the lower edge of the first ell bin.
+        lmax : int, optional
+            The maximum ell value over which to define window functions.
+            Default behavior is to use the upper edge of the last ell bin.
+        strict : bool, optional
+            Defines behavior for the new BPWF object. Default = False.
+
+        Returns
+        -------
+        bpwf : BPWF object
+            New object containing tophat window functions for the specified
+            spectra.
+
+        """
+        
+        # Make tophat window functions
+        if lmin is None:
+            lmin = bin_edges[0]
+        if lmax is None:
+            lmax = bin_edges[-1]
+        nbin = len(bin_edges) - 1
+        fn = np.zeros(shape=(nbin, lmax - lmin))
+        for i in range(len(bin_edges) - 1):
+            i0 = bin_edges[i] - lmin
+            i1 = bin_edges[i+1] - lmin
+            fn[i,i0:i1] = 1 / (i1 - i0)
+        # Create BPWF object
+        bpwf = cls(maplist, nbin)
+        for (i, m0, m1) in specgen(len(maplist)):
+            specin = maplist[m0].field + maplist[m1].field
+            if specin == 'ET': specin = 'TE'
+            if specin == 'BE': specin = 'EB'
+            if specin == 'BT': specin = 'TB'
+            bpwf.add_windowfn(specin, m0, m1, fn, lmin, lmax)
+        # Done
+        return bpwf
+        
     def add_windowfn(self, specin, m0, m1, windowfn, lmin=None, lmax=None):
         """
         Add a set of bandpower window functions to the BPWF object.
@@ -247,13 +299,13 @@ class BPWF():
         for (i,val) in enumerate(mapind):
             if type(val) == str:
                 mapind[i] = [m.name for m in maplist].index(val)
-        # Process ellind argument.
-        if ellind is None:
-            ellind = range(self.nbin)
 
         # Create new BPWF object.
         maplist_new = [self.maplist[i] for i in mapind]
-        nbin_new = len(ellind)
+        if ellind is not None:
+            nbin_new = len(ellind)
+        else:
+            nbin_new = self.nbin
         bpwf_new = BPWF(maplist_new, nbin_new, strict=self.strict)
 
         # Copy window functions to new object.
@@ -261,6 +313,11 @@ class BPWF():
             # Find the index of this spectra in old BPWF object.
             i0 = specind(len(self.maplist), mapind[m0], mapind[m1])
             # Copy BPWF
-            bpwf_new.bpwf[i] = self.bpwf[i0]
+            bpwf_new.bpwf[i] = self.bpwf[i0].copy()
+            # If ellind argument is specified, keep only those ell bins.
+            if ellind is not None:
+                for key in bpwf_new.bpwf[i].keys():
+                    bpwf_new.bpwf[i][key]['fn'] = (
+                        bpwf_new.bpwf[i][key]['fn'][ellind,:])
         # Done
         return bpwf_new
