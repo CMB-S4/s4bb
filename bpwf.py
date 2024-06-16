@@ -6,9 +6,36 @@ Bandpower window functions
 """
 
 import numpy as np
+from spectra import specind, specgen
 
 class BPWF():
+    """
+    A BPWF object contains the bandpower window functions corresponding to the
+    set of binned output spectra that can be calculated from a set of maps.
+    Window functions are defined by the output spectrum (cross between two
+    maps), the input spectrum (one of the six possible spectra from input
+    TQU sky maps), and the ell bin.
+
+    """
+    
     def __init__(self, maplist, nbin, strict=False):
+        """
+        Creates a BPWF structure for the specified list of maps.
+
+        Parameters
+        ----------
+        maplist : list of MapDef objects
+            The set of maps that define possible output spectra.
+        nbin : int
+            Number of ell bins, assumed to be the same for all spectra.
+        strict : bool, optional
+            If True, then the window_expv function will throw a KeyError if
+            you request a window function which has not been defined (via the
+            add_windowfn method). If False (default value), then expectation
+            values will be zero for any undefined window function.
+
+        """
+        
         self.maplist = maplist
         self.nbin = nbin
         self.bpwf = {}
@@ -62,11 +89,11 @@ class BPWF():
         if lmin is None:
             lmin = 0
         if lmax is None:
-            lmax = windowfn.shape[0] - 1
-        assert windowfn.shape[1] == (lmax - lmin + 1)
+            lmax = lmin + windowfn.shape[1]
+        assert windowfn.shape[1] == (lmax - lmin)
 
         # Add window functions to the BPWF object.
-        specout = (min(m0,m1), max(m0,m1))
+        specout = specind(len(self.maplist), m0, m1)
         if specout not in self.bpwf.keys():
             self.bpwf[specout] = {}
         self.bpwf[specout][specin] = {'fn': windowfn,
@@ -107,7 +134,7 @@ class BPWF():
         if (m0 >= len(self.maplist)) or (m1 >= len(self.maplist)):
             raise ValueError('invalid map argument')
         # Check that we have the requested window functions.
-        specout = (min(m0, m1), max(m0, m1))
+        specout = specind(len(self.maplist), m0, m1)
         if specout not in self.bpwf.keys():
             return False
         if specin not in self.bpwf[specout].keys():
@@ -115,9 +142,9 @@ class BPWF():
         # If we didn't fail previous two tests, then window fn exists.
         return True
         
-    def window_integral(self, specin, m0, m1, fn):
+    def window_expv(self, specin, m0, m1, fn):
         """
-        Calculates the window-fn weighted integral for specified function.
+        Calculates the window-fn weighted sum for specified function.
 
         Parameters
         ----------
@@ -155,15 +182,14 @@ class BPWF():
             m0 = [m.name for m in self.maplist].index(m0)
         if type(m1) is str:
             m1 = [m.name for m in self.maplist].index(m1)
-        specout = (min(m0, m1), max(m0, m1))
+        specout = specind(len(self.maplist), m0, m1)
         
         # Calculate window-function weighted integrals.
         bpwf = self.bpwf[specout][specin]
-        ell = np.arange(bpwf['lmin'], bpwf['lmax'] + 1)
+        ell = np.arange(bpwf['lmin'], bpwf['lmax'])
         expv = np.zeros(self.nbin)
         for i in range(self.nbin):
-            expv[i] = (np.trapz(fn(ell) * bpwf['fn'][i,:], x=ell) /
-                       np.trapz(bpwf['fn'][i,:], x=ell))
+            expv[i] = np.sum(fn(ell) * bpwf['fn'][i,:])
         return expv
 
     def ell_eff(self, specin, m0, m1):
@@ -190,4 +216,51 @@ class BPWF():
 
         """
 
-        return self.window_integral(specin, m0, m1, lambda x: x)
+        return self.window_expv(specin, m0, m1, lambda x: x)
+
+    def select(self, mapind=None, ellind=None):
+        """
+        Make a new BPWF object with selected maps and/or ell bins.
+
+        Parameters
+        ----------
+        mapind : list, optional
+            List of maps to keep for the new BPWF object. Maps can be specified
+            either by their integer index in the existing maplist or by their
+            names (as strings). Defaults to None, which means to *keep all
+            maps*.
+        ellind : list, optional
+            List of ell bins to keep for the new BPWF object. Ell bin are
+            specified by their integer index. Defaults to None, which means to
+            *keep all ell bins*.
+
+        Returns
+        -------
+        bpwf_new : BPWF
+            New BPWF object with selected maps and ell bins only.
+
+        """
+
+        # Process mapind argument.
+        if mapind is None:
+            mapind = range(len(self.maplist))
+        for (i,val) in enumerate(mapind):
+            if type(val) == str:
+                mapind[i] = [m.name for m in maplist].index(val)
+        # Process ellind argument.
+        if ellind is None:
+            ellind = range(self.nbin)
+
+        # Create new BPWF object.
+        maplist_new = [self.maplist[i] for i in mapind]
+        nbin_new = len(ellind)
+        bpwf_new = BPWF(maplist_new, nbin_new, strict=self.strict)
+
+        # Copy window functions to new object.
+        for (i, m0, m1) in specgen(len(maplist_new)):
+            # Find the index of this spectra in old BPWF object.
+            i0 = specind(len(self.maplist), mapind[m0], mapind[m1])
+            # Copy BPWF
+            bpwf_new.bpwf[i] = self.bpwf[i0]
+        # Done
+        return bpwf_new
