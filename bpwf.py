@@ -3,6 +3,30 @@
 Bandpower window functions
 ==========================
 
+Bandpower window functions describe the mapping of power from true sky signals
+to measured bandpowers, including the effects of beams, filtering, partial sky
+coverage, map apodization, etc.
+
+We use a very general treatment of bandpower window functions, so that any
+measured bandpower can have up to six window functions describing the transfer
+functions from true sky TT, EE, BB, TE, EB, and TB. In practice, many of these
+functions will be zero, e.g. TT->BB window function is zero in the absence of
+temperature-to-polarization leakage.
+
+Some conventions followed here:
+* Expectation values are calculated as the theory spectrum multiplied by the
+  window function and summed over ell values. The range of the summation is
+  set by the ell values for which the window function is defined. It is not
+  necessary to define the window function at Delta-ell=1 intervals, but no
+  Delta-ell factor is included in the sum, so this might have unanticipated
+  effects.
+* We do not enforce any normalization for the bandpower window functions, so
+  window functions with the same shape but different amplitudes will yield
+  different expectation values. The purpose of this choice is so that the
+  overall signal suppression factor can be encoded as the normalization.
+* We assume that all binned output spectra share a common set of ell bins.
+  This assumption could be relaxed if someone has a good reason.
+
 """
 
 import numpy as np
@@ -12,6 +36,10 @@ class BPWF():
     """
     A BPWF object contains the bandpower window functions corresponding to the
     set of binned output spectra that can be calculated from a set of maps.
+
+    The purpose of this object is to calculate bandpower expectation values
+    from unbinned theory spectra.
+
     Window functions are defined by the output spectrum (cross between two
     maps), the input spectrum (one of the six possible spectra from input
     TQU sky maps), and the ell bin.
