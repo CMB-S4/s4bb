@@ -29,8 +29,8 @@ class BPWF():
         nbin : int
             Number of ell bins, assumed to be the same for all spectra.
         strict : bool, optional
-            If True, then the window_expv function will throw a KeyError if
-            you request a window function which has not been defined (via the
+            If True, then the expv function will throw a KeyError if you
+            request a window function which has not been defined (via the
             add_windowfn method). If False (default value), then expectation
             values will be zero for any undefined window function.
 
@@ -194,7 +194,7 @@ class BPWF():
         # If we didn't fail previous two tests, then window fn exists.
         return True
         
-    def window_expv(self, specin, m0, m1, fn):
+    def expv(self, specin, m0, m1, fn):
         """
         Calculates the window-fn weighted sum for specified function.
 
@@ -239,10 +239,10 @@ class BPWF():
         # Calculate window-function weighted integrals.
         bpwf = self.bpwf[specout][specin]
         ell = np.arange(bpwf['lmin'], bpwf['lmax'])
-        expv = np.zeros(self.nbin)
+        expvals = np.zeros(self.nbin)
         for i in range(self.nbin):
-            expv[i] = np.sum(fn(ell) * bpwf['fn'][i,:])
-        return expv
+            expvals[i] = np.sum(fn(ell) * bpwf['fn'][i,:])
+        return expvals
 
     def ell_eff(self, specin, m0, m1):
         """
@@ -268,7 +268,7 @@ class BPWF():
 
         """
 
-        return self.window_expv(specin, m0, m1, lambda x: x)
+        return self.expv(specin, m0, m1, lambda x: x)
 
     def update(self, maplist=None, ellind=None):
         """
