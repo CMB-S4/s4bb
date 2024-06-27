@@ -270,54 +270,66 @@ class BPWF():
 
         return self.window_expv(specin, m0, m1, lambda x: x)
 
-    def select(self, mapind=None, ellind=None):
+    def update(self, maplist=None, ellind=None):
         """
-        Make a new BPWF object with selected maps and/or ell bins.
+        Make a new BPWF object with different map list and/or ell bins.
+
+        This function can be used to downselect maps or ell bins from a BPWF
+        object or to add new maps. Window functions will be copied over from
+        the existing BPWF object to the new BPWF object, but if new maps are
+        added, the corresponding window functions will have to be added using
+        the add_windowfn method.
 
         Parameters
         ----------
-        mapind : list, optional
-            List of maps to keep for the new BPWF object. Maps can be specified
-            either by their integer index in the existing maplist or by their
-            names (as strings). Defaults to None, which means to *keep all
-            maps*.
+        maplist : list of MapDef objects, optional
+            List of maps to use for the new BPWF object. Defaults to None,
+            which means that the new BPWF object will have the same map list as
+            the existing object.
         ellind : list, optional
-            List of ell bins to keep for the new BPWF object. Ell bin are
+            List of ell bins to keep for the new BPWF object. Ell bins are
             specified by their integer index. Defaults to None, which means to
             *keep all ell bins*.
 
         Returns
         -------
         bpwf_new : BPWF
-            New BPWF object with selected maps and ell bins only.
+            New BPWF object with updated maps and ell bins.
 
         """
 
         # Process mapind argument.
-        if mapind is None:
-            mapind = range(len(self.maplist))
-        for (i,val) in enumerate(mapind):
-            if type(val) == str:
-                mapind[i] = [m.name for m in maplist].index(val)
+        if maplist is None:
+            maplist = self.maplist
+        # Find mapping between new and old map lists.
+        # Newly added maps are marked with None.
+        mapind = []
+        for m in maplist:
+            try:
+                mapind.append(self.maplist.index(m))
+            except ValueError:
+                mapind.append(None)
 
         # Create new BPWF object.
-        maplist_new = [self.maplist[i] for i in mapind]
         if ellind is not None:
-            nbin_new = len(ellind)
+            nbin = len(ellind)
         else:
-            nbin_new = self.nbin
-        bpwf_new = BPWF(maplist_new, nbin_new, strict=self.strict)
+            nbin = self.nbin
+        bpwf_new = BPWF(maplist, nbin, strict=self.strict)
 
         # Copy window functions to new object.
-        for (i, m0, m1) in specgen(len(maplist_new)):
-            # Find the index of this spectra in old BPWF object.
-            i0 = specind(len(self.maplist), mapind[m0], mapind[m1])
-            # Copy BPWF
-            bpwf_new.bpwf[i] = self.bpwf[i0].copy()
-            # If ellind argument is specified, keep only those ell bins.
-            if ellind is not None:
-                for key in bpwf_new.bpwf[i].keys():
-                    bpwf_new.bpwf[i][key]['fn'] = (
-                        bpwf_new.bpwf[i][key]['fn'][ellind,:])
+        for (i, m0, m1) in specgen(len(maplist)):
+            # If either map is new, then old BPWF object doesn't have window
+            # functions to copy.
+            if (mapind[m0] is not None) and (mapind[m1] is not None):
+                # Find the index of this spectra in old BPWF object.
+                i0 = specind(len(self.maplist), mapind[m0], mapind[m1])
+                # Copy BPWF
+                bpwf_new.bpwf[i] = self.bpwf[i0].copy()
+                # If ellind argument is specified, keep only those ell bins.
+                if ellind is not None:
+                    for key in bpwf_new.bpwf[i].keys():
+                        bpwf_new.bpwf[i][key]['fn'] = (
+                            bpwf_new.bpwf[i][key]['fn'][ellind,:])
         # Done
         return bpwf_new
