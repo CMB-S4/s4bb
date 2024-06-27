@@ -81,6 +81,32 @@ def mapind(nspec, s0):
 def specgen(nmap):
     """
     Generator function for iterating over spectra in vecp ordering.
+
+    Parameters
+    ----------
+    nmap : int
+        Number of maps to iterate over.
+
+    Yields
+    ------
+    i : int
+        Spectrum index, starts at 0 and increments by 1.
+    m0 : int
+        Map 1 index
+    m1 : int
+        Map 2 index
+
+    Example
+    -------
+    >>> nmap = 3
+    >>> for (i, m0, m1) in specgen(nmap):
+            print((i, m0, m1))
+        (0, 0, 0)
+        (1, 1, 1)
+        (2, 2, 2)
+        (3, 0, 1)
+        (4, 1, 2)
+        (5, 0, 2)
     
     """
 
@@ -103,14 +129,38 @@ class MapDef():
 
     """
 
-    def __init__(self, name, field, bandpass):
+    def __init__(self, name, field, bandpass=None):
+        """
+        Create a new MapDef object.
+
+        Parameters
+        ----------
+        name : string
+            Name of the map.
+        field : string
+            Specifies which field the map represents. Valid options are 'T',
+            'E', or 'B'.
+        bandpass : Bandpass object, optional
+            Object describing the bandpass of the map.
+
+        """
+        
         self.name = name
-        assert field.upper() in ['T','E','B','LB']
+        assert field.upper() in ['T','E','B']
         self.field = field.upper()
         self.bandpass = bandpass
 
     def __str__(self):
         return '{} (type: {})'.format(self.name, self.field)
+
+    def __eq__(self, value):
+        """
+        MapDef objects are considered equivalent if the name and field match.
+        We don't check whether the bandpasses match.
+        
+        """
+        
+        return (self.name == value.name) and (self.field == value.field)
 
 class XSpec():
     """
