@@ -65,6 +65,7 @@ class BPWF():
         """
         
         self.maplist = maplist
+        self.nmap = len(maplist)
         self.nbin = nbin
         self.bpwf = {}
         self.strict = strict
@@ -352,8 +353,14 @@ class BPWF():
             if (mapind[m0] is not None) and (mapind[m1] is not None):
                 # Find the index of this spectra in old BPWF object.
                 i0 = specind(len(self.maplist), mapind[m0], mapind[m1])
-                # Copy BPWF
-                bpwf_new.bpwf[i] = self.bpwf[i0].copy()
+                # Copy BPWF -- have to do this manually to avoid duplicate
+                # references to window function np arrays.
+                bpwf_new.bpwf[i] = {}
+                for spec in ['TT','EE','BB','TE','EB','TB']:
+                    if spec in self.bpwf[i0].keys():
+                        bpwf_new.bpwf[i][spec] = {'fn': self.bpwf[i0][spec]['fn'].copy(),
+                                                  'lmin': self.bpwf[i0][spec]['lmin'],
+                                                  'lmax': self.bpwf[i0][spec]['lmax']}
                 # If ellind argument is specified, keep only those ell bins.
                 if ellind is not None:
                     for key in bpwf_new.bpwf[i].keys():
