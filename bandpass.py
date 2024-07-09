@@ -16,7 +16,7 @@ Some conventions followed here:
   Hz^{-1}. Note that some experiments, notably WMAP, have used a bandpass
   convention that is response per unit frequency to a source with
   Rayleigh-Jeans spectrum, which is differs by a factor of nu^2.
-* Bandpass integrals over frequency are computed using np.trapz, which will
+* Bandpass integrals over frequency are computed using np.trapezoid, which will
   handle irregular binning in frequency.
 
 """
@@ -51,7 +51,7 @@ class Bandpass():
         self.nu = nu
         # Normalize weights... not strictly necessary because the
         # bandpass_integral method also includes normalization.
-        self.wgt = wgt / np.trapz(wgt, x=nu)
+        self.wgt = wgt / np.trapezoid(wgt, x=nu)
 
     @classmethod
     def deltafn(cls, nu0, epsilon=1e-6):
@@ -117,8 +117,8 @@ class Bandpass():
 
         """
         
-        return (np.trapz(self.wgt * fn(self.nu), x=self.nu) /
-                np.trapz(self.wgt, x=self.nu))
+        return (np.trapezoid(self.wgt * fn(self.nu), x=self.nu) /
+                np.trapezoid(self.wgt, x=self.nu))
 
     def cmb_unit_conversion(self):
         """
