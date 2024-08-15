@@ -299,15 +299,13 @@ class BPWF():
 
         return self.expv(specin, m0, m1, lambda x: x)
 
-    def update(self, maplist=None, ellind=None):
+    def select(self, maplist=None, ellind=None):
         """
-        Make a new BPWF object with different map list and/or ell bins.
+        Make a new BPWF object with selected maps and/or ell bins.
 
         This function can be used to downselect maps or ell bins from a BPWF
-        object or to add new maps. Window functions will be copied over from
-        the existing BPWF object to the new BPWF object, but if new maps are
-        added, the corresponding window functions will have to be added using
-        the add_windowfn method.
+        object. Window functions will be copied over from the existing BPWF
+        object to the new BPWF object.
 
         Parameters
         ----------
@@ -329,15 +327,14 @@ class BPWF():
 
         # Process mapind argument.
         if maplist is None:
-            maplist = self.maplist
+            # Not a deep copy, but I don't expect anyone to change the
+            # MapDef objects out from under me.
+            maplist = self.maplist.copy()
         # Find mapping between new and old map lists.
         # Newly added maps are marked with None.
         mapind = []
         for m in maplist:
-            try:
-                mapind.append(self.maplist.index(m))
-            except ValueError:
-                mapind.append(None)
+            mapind.append(self.maplist.index(m))
 
         # Create new BPWF object.
         if ellind is not None:
@@ -348,23 +345,20 @@ class BPWF():
 
         # Copy window functions to new object.
         for (i, m0, m1) in specgen(len(maplist)):
-            # If either map is new, then old BPWF object doesn't have window
-            # functions to copy.
-            if (mapind[m0] is not None) and (mapind[m1] is not None):
-                # Find the index of this spectra in old BPWF object.
-                i0 = specind(len(self.maplist), mapind[m0], mapind[m1])
-                # Copy BPWF -- have to do this manually to avoid duplicate
-                # references to window function np arrays.
-                bpwf_new.bpwf[i] = {}
-                for spec in ['TT','EE','BB','TE','EB','TB']:
-                    if spec in self.bpwf[i0].keys():
-                        bpwf_new.bpwf[i][spec] = {'fn': self.bpwf[i0][spec]['fn'].copy(),
-                                                  'lmin': self.bpwf[i0][spec]['lmin'],
-                                                  'lmax': self.bpwf[i0][spec]['lmax']}
-                # If ellind argument is specified, keep only those ell bins.
-                if ellind is not None:
-                    for key in bpwf_new.bpwf[i].keys():
-                        bpwf_new.bpwf[i][key]['fn'] = (
-                            bpwf_new.bpwf[i][key]['fn'][ellind,:])
+            # Find the index of this spectra in old BPWF object.
+            i0 = specind(len(self.maplist), mapind[m0], mapind[m1])
+            # Copy BPWF -- have to do this manually to avoid duplicate
+            # references to window function np arrays.
+            bpwf_new.bpwf[i] = {}
+            for spec in ['TT','EE','BB','TE','EB','TB']:
+                if spec in self.bpwf[i0].keys():
+                    bpwf_new.bpwf[i][spec] = {'fn': self.bpwf[i0][spec]['fn'].copy(),
+                                              'lmin': self.bpwf[i0][spec]['lmin'],
+                                              'lmax': self.bpwf[i0][spec]['lmax']}
+            # If ellind argument is specified, keep only those ell bins.
+            if ellind is not None:
+                for key in bpwf_new.bpwf[i].keys():
+                    bpwf_new.bpwf[i][key]['fn'] = (
+                        bpwf_new.bpwf[i][key]['fn'][ellind,:])
         # Done
         return bpwf_new

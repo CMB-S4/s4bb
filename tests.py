@@ -11,6 +11,7 @@ import numpy as np
 from spectra import MapDef, specind, mapind, specgen
 from bandpass import Bandpass
 from bpwf import BPWF
+from bpcov import BpCov
 
 class SpectraTest(unittest.TestCase):
     """
@@ -128,11 +129,11 @@ class BpwfTest(unittest.TestCase):
         for spectype in ['TT','EE','BB','TE','EB']:
             self.assertTrue(all(self.wf.expv(spectype, 0, 2, lambda x: 1) == np.zeros(self.nbin)))
 
-    def test_update(self):
-        """Test BPWF update method"""
+    def test_select(self):
+        """Test BPWF select method"""
 
         # First, try downselecting maps -- keep E and B only
-        wfnew = self.wf.update([self.maplist[1], self.maplist[2]], None)
+        wfnew = self.wf.select([self.maplist[1], self.maplist[2]], None)
         # map0 x map0 should be EE only
         self.assertTrue(all(wfnew.expv('EE', 0, 0, lambda x: 1) == np.ones(self.nbin)))
         for spectype in ['TT','BB','TE','EB','TB']:
@@ -148,23 +149,10 @@ class BpwfTest(unittest.TestCase):
 
         # Next, try downselecting ell bins -- keep bins 2 and 3 only
         keep = [2, 3]
-        wfnew = self.wf.update(None, keep)
+        wfnew = self.wf.select(None, keep)
         self.assertEqual(len(keep), wfnew.nbin)
         self.assertTrue(all(self.wf.ell_eff('TT', 0, 0)[keep] == wfnew.ell_eff('TT', 0, 0)))
 
-        # Try adding a map to the object
-        maplist = self.wf.maplist.copy()
-        maplist.append(MapDef('m3_B', 'B'))
-        wfnew = self.wf.update(maplist, None)
-        self.assertEqual(len(maplist), wfnew.nmap)
-        # The newly added map should have no associated window functions for
-        # auto or cross spectra, because we haven't defined them.
-        for spectype in ['TT','EE','BB','TE','EB','TB']:
-            self.assertTrue(all(wfnew.expv(spectype, 3, 3, lambda x: 1) == np.zeros(self.nbin)))
-            self.assertTrue(all(wfnew.expv(spectype, 0, 3, lambda x: 1) == np.zeros(self.nbin)))
-            self.assertTrue(all(wfnew.expv(spectype, 1, 3, lambda x: 1) == np.zeros(self.nbin)))
-            self.assertTrue(all(wfnew.expv(spectype, 2, 3, lambda x: 1) == np.zeros(self.nbin)))
-    
 if __name__ == '__main__':
     unittest.main()
 
