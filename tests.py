@@ -153,6 +153,152 @@ class BpwfTest(unittest.TestCase):
         self.assertEqual(len(keep), wfnew.nbin)
         self.assertTrue(all(self.wf.ell_eff('TT', 0, 0)[keep] == wfnew.ell_eff('TT', 0, 0)))
 
+class BpCovTest(unittest.TestCase):
+    """
+    Unit tests for bpcov.py
+
+    """
+
+    def test_mask_ell(self):
+        """Test BpCov.mask_ell method"""
+
+        # Make a BpCov structure with two maps, three ell bins.
+        map1 = MapDef('map1', 'B')
+        map2 = MapDef('map2', 'B')
+        maplist = [map1, map2]
+        bpcm = BpCov(maplist, 3)
+        bpcm.set(np.ones((9,9)))
+
+        # noffdiag=0
+        self.assertTrue((bpcm.get(noffdiag=0) == np.array([[1,1,1,0,0,0,0,0,0],
+                                                           [1,1,1,0,0,0,0,0,0],
+                                                           [1,1,1,0,0,0,0,0,0],
+                                                           [0,0,0,1,1,1,0,0,0],
+                                                           [0,0,0,1,1,1,0,0,0],
+                                                           [0,0,0,1,1,1,0,0,0],
+                                                           [0,0,0,0,0,0,1,1,1],
+                                                           [0,0,0,0,0,0,1,1,1],
+                                                           [0,0,0,0,0,0,1,1,1]])).all())
+        # noffdiag=1
+        self.assertTrue((bpcm.get(noffdiag=1) == np.array([[1,1,1,1,1,1,0,0,0],
+                                                           [1,1,1,1,1,1,0,0,0],
+                                                           [1,1,1,1,1,1,0,0,0],
+                                                           [1,1,1,1,1,1,1,1,1],
+                                                           [1,1,1,1,1,1,1,1,1],
+                                                           [1,1,1,1,1,1,1,1,1],
+                                                           [0,0,0,1,1,1,1,1,1],
+                                                           [0,0,0,1,1,1,1,1,1],
+                                                           [0,0,0,1,1,1,1,1,1]])).all())
+        # noffdiag=2
+        self.assertTrue((bpcm.get(noffdiag=2) == np.ones((9,9))).all())
+    
+    def test_select_map(self):
+        """Test BpCov.select method for maps"""
+    
+        # Make a BpCov structure with three maps, one ell bin.
+        map1 = MapDef('map1', 'B')
+        map2 = MapDef('map2', 'B')
+        map3 = MapDef('map3', 'B')
+        maplist = [map1, map2, map3]
+        bpcm = BpCov(maplist, 1)
+        bpcm.set(np.array([[ 0,  1,  2,  3,  4,  5],
+                           [ 6,  7,  8,  9, 10, 11],
+                           [12, 13, 14, 15, 16, 17],
+                           [18, 19, 20, 21, 22, 23],
+                           [24, 25, 26, 27, 28, 29],
+                           [30, 31, 32, 33, 34, 35]]))
+    
+        # Select map1 only.
+        bpcm1 = bpcm.select(maplist=[map1], ellind=None)
+        self.assertTrue((bpcm1.get() == np.array([0])).all())
+        # Select map2 only.
+        bpcm2 = bpcm.select(maplist=[map2], ellind=None)
+        self.assertTrue((bpcm2.get() == np.array([7])).all())
+        # Select map3 only.
+        bpcm3 = bpcm.select(maplist=[map3], ellind=None)
+        self.assertTrue((bpcm3.get() == np.array([14])).all())
+    
+        # Select map1 and map2.
+        bpcm12 = bpcm.select(maplist=[map1, map2], ellind=None)
+        self.assertTrue((bpcm12.get() == np.array([[ 0,  1,  3],
+                                                   [ 6,  7,  9],
+                                                   [18, 19, 21]])).all())
+        # Select map2 and map3
+        bpcm23 = bpcm.select(maplist=[map2, map3], ellind=None)
+        self.assertTrue((bpcm23.get() == np.array([[ 7,  8, 10],
+                                                   [13, 14, 16],
+                                                   [25, 26, 28]])).all())
+        # Select map1 and map3
+        bpcm13 = bpcm.select(maplist=[map1, map3], ellind=None)
+        self.assertTrue((bpcm13.get() == np.array([[ 0,  2,  5],
+                                                   [12, 14, 17],
+                                                   [30, 32, 35]])).all())
+    
+        # Keep all three maps, but permute their order.
+        bpcm231 = bpcm.select(maplist=[map2, map3, map1], ellind=None)
+        self.assertTrue((bpcm231.get() == np.array([[ 7,  8,  6, 10, 11,  9],
+                                                    [13, 14, 12, 16, 17, 15],
+                                                    [ 1,  2,  0,  4,  5,  3],
+                                                    [25, 26, 24, 28, 29, 27],
+                                                    [31, 32, 30, 34, 35, 33],
+                                                    [19, 20, 18, 22, 23, 21]])).all())
+
+    def test_select_ell(self):
+        """Test BpCov.select method for ell bins"""
+
+        # Make a BpCov structure with two maps, three ell bins.
+        map1 = MapDef('map1', 'B')
+        map2 = MapDef('map2', 'B')
+        maplist = [map1, map2]
+        bpcm = BpCov(maplist, 3)
+        M = np.ones((3,3))
+        M = np.concat((M, 2*M, 4*M))
+        M = np.concat((M, 3*M, 9*M), axis=1)
+        bpcm.set(M)
+
+        # Select bin 0 only.
+        bpcm0 = bpcm.select(maplist=None, ellind=[0])
+        self.assertTrue((bpcm0.get() == np.ones((3,3))).all())
+        # Select bin 1 only.
+        bpcm1 = bpcm.select(maplist=None, ellind=[1])
+        self.assertTrue((bpcm1.get() == 6 * np.ones((3,3))).all())
+        # Select bin 2 only.
+        bpcm2 = bpcm.select(maplist=None, ellind=[2])
+        self.assertTrue((bpcm2.get() == 36 * np.ones((3,3))).all())
+
+        # Select bins 0 and 1.
+        bpcm01 = bpcm.select(maplist=None, ellind=[0,1])
+        self.assertTrue((bpcm01.get() == np.array([[1, 1, 1, 3, 3, 3],
+                                                   [1, 1, 1, 3, 3, 3],
+                                                   [1, 1, 1, 3, 3, 3],
+                                                   [2, 2, 2, 6, 6, 6],
+                                                   [2, 2, 2, 6, 6, 6],
+                                                   [2, 2, 2, 6, 6, 6]])).all())
+        # Select bins 1 and 2.
+        bpcm12 = bpcm.select(maplist=None, ellind=[1,2])
+        self.assertTrue((bpcm12.get() == np.array([[ 6,  6,  6, 18, 18, 18],
+                                                   [ 6,  6,  6, 18, 18, 18],
+                                                   [ 6,  6,  6, 18, 18, 18],
+                                                   [12, 12, 12, 36, 36, 36],
+                                                   [12, 12, 12, 36, 36, 36],
+                                                   [12, 12, 12, 36, 36, 36]])).all())
+        # Select bins 0 and 2.
+        bpcm02 = bpcm.select(maplist=None, ellind=[0,2])
+        self.assertTrue((bpcm02.get() == np.array([[1, 1, 1,  9,  9,  9],
+                                                   [1, 1, 1,  9,  9,  9],
+                                                   [1, 1, 1,  9,  9,  9],
+                                                   [4, 4, 4, 36, 36, 36],
+                                                   [4, 4, 4, 36, 36, 36],
+                                                   [4, 4, 4, 36, 36, 36]])).all())
+        # Select bins 2 and 0, i.e. flip the order.
+        bpcm20 = bpcm.select(maplist=None, ellind=[2,0])
+        self.assertTrue((bpcm20.get() == np.array([[36, 36, 36, 4, 4, 4],
+                                                   [36, 36, 36, 4, 4, 4],
+                                                   [36, 36, 36, 4, 4, 4],
+                                                   [ 9,  9,  9, 1, 1, 1],
+                                                   [ 9,  9,  9, 1, 1, 1],
+                                                   [ 9,  9,  9, 1, 1, 1]])).all())
+        
 if __name__ == '__main__':
     unittest.main()
 
