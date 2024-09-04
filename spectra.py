@@ -1,7 +1,7 @@
 """
-=======================
-Cross-spectral analysis
-=======================
+=============
+Power spectra
+=============
 
 """
 
@@ -164,18 +164,77 @@ class MapDef():
 
 class XSpec():
     """
-    The XSpec object is used for likelihood analysis using the set of auto and
-    cross-spectra.
-    
-    """
-    
-    def __init__(self, maplist, bpcov=None, bpwf=None):
-        self.maplist = maplist
-        self.bpcov = bpcov
-        self.bpwf = bpwf
+    The XSpec object contains the full set of auto and cross spectra for a
+    list of maps, and supports multiple realizations.
 
-    def __str__(self):
-        desc = '[XSpec object] {} maps:'.format(len(self.maplist))
-        for i in range(len(self.maplist)):
-            desc += ' {}'.format(self.maplist[i].name)
-        return desc
+    """
+
+    def __init__(self, maplist, bins, spec):
+        """
+        Create a new XSpec object.
+
+        Parameters
+        ----------
+        maplist : list of MapDef objects
+            The set of maps that define auto and cross-spectra.
+        bins : array, shape=(2,nbin)
+            Lower and upper edges for each ell bin. Ell bin lower edges should
+            be stored in bins[0,:] and upper edges in bins[1,:].
+        spec : array, shape=(nspec,nbin,nrlz)
+            Array of auto and cross-spectra following vecp ordering along
+            axis 0. Ell bins extend along axis 1. If there are multiple
+            independent realizations of the spectra, these are provided along
+            axis 2. The array can be two-dimensional if there is only one
+            realization.
+
+        """
+
+        # Record map list and ell bins.
+        self.maplist = maplist
+        self.bins = bins
+        # Check that spectra have the right shape.
+        nmap = len(maplist)
+        nspec = nmap * (nmap + 1) // 2
+        assert spec.shape[0] == nspec
+        nbin = bins.shape[1]
+        assert spec.shape[1] == nbin
+        # Expand spec array to three dimensions, if necessary.
+        # Should we .copy() these arrays??
+        if spec.ndim == 2:
+            self.spec = spec.reshape(nspec, nbin, 1)
+        else:
+            self.spec = spec
+
+    def nmap(self):
+        """Returns the number of maps"""
+
+        return len(self.maplist)
+
+    def nspec(self):
+        """Returns the number of spectra"""
+
+        return self.spec.shape[0]
+
+    def nbin(self):
+        """Returns the number of ell bins"""
+
+        return self.spec.shape[1]
+
+    def nrlz(self):
+        """Returns the number of sim realizations"""
+
+        return self.spec.shape[2]
+
+    def __add__(self, xspec):
+        """
+        Concatenates two XSpec objects along the realizations axis (axis 2).
+        The two XSpec objects must have matching maplist and ell bins.
+
+        """
+
+        assert self.maplist == xspec.maplist
+        assert (self.bins == xspec.bins).all()
+        return XSpec(self.maplist, self.bins,
+                     np.concatenate((self.spec, xspec.spec), axis=2))
+
+

@@ -8,7 +8,7 @@ Unit Tests
 import unittest
 import numpy as np
 
-from spectra import MapDef, specind, mapind, specgen
+from spectra import specind, mapind, specgen, MapDef, XSpec
 from bandpass import Bandpass
 from bpwf import BPWF
 from bpcov import BpCov
@@ -34,6 +34,9 @@ class SpectraTest(unittest.TestCase):
                      (0, 3), (1, 4),
                      (0, 4)]
         self.nspec = len(self.spec)
+        # Lower and upper edges for three ell bins
+        self.bins = np.array([[10, 20, 30], [20, 30, 40]])
+        self.nbin = self.bins.shape[1]
 
     def test_specind(self):
         """Test specind function"""
@@ -62,6 +65,24 @@ class SpectraTest(unittest.TestCase):
         self.assertEqual(self.maps[0], MapDef('m0_T', 'T'))
         self.assertNotEqual(self.maps[0], MapDef('m0_T', 'E'))
         self.assertNotEqual(self.maps[0], MapDef('m1_T', 'T'))
+
+    def test_XSpec(self):
+        """Test XSpec class"""
+
+        # Try concatenating two sets of spectra.
+        nrlz1 = 4
+        spec1 = np.ones((self.nspec, self.nbin, nrlz1))
+        xspec1 = XSpec(self.maps, self.bins, spec1)
+        nrlz2 = 2
+        spec2 = 4 * np.ones((self.nspec, self.nbin, nrlz2))
+        xspec2 = XSpec(self.maps, self.bins, spec2)
+        xspec3 = xspec1 + xspec2
+        self.assertEqual(xspec3.nmap(), self.nmap)
+        self.assertEqual(xspec3.nspec(), self.nspec)
+        self.assertEqual(xspec3.nbin(), self.nbin)
+        self.assertEqual(xspec3.nrlz(), nrlz1 + nrlz2)
+        self.assertTrue((xspec3.spec[:,:,0:nrlz1] == spec1).all())
+        self.assertTrue((xspec3.spec[:,:,nrlz1:] == spec2).all())
 
 class BandpassTest(unittest.TestCase):
     """
