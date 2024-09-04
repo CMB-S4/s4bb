@@ -151,7 +151,7 @@ class MapDef():
         self.bandpass = bandpass
 
     def __str__(self):
-        return '{} (type: {})'.format(self.name, self.field)
+        return '{}_{}'.format(self.name, self.field)
 
     def __eq__(self, value):
         """
@@ -228,6 +228,7 @@ class XSpec():
     def __add__(self, xspec):
         """
         Concatenates two XSpec objects along the realizations axis (axis 2).
+
         The two XSpec objects must have matching maplist and ell bins.
 
         """
@@ -237,4 +238,30 @@ class XSpec():
         return XSpec(self.maplist, self.bins,
                      np.concatenate((self.spec, xspec.spec), axis=2))
 
+    def str(self, ispec=None):
+        """
+        List of spectra written in string format.
 
+        Parameters
+        ----------
+        ispec : int, optional
+            If specified, then returns only the string describing the spectrum
+            with the specified index. By default, returns a list containing
+            strings for all spectra.
+
+        Returns
+        -------
+        specstr : list
+            A list of strings describing the spectra. An example string would
+            be "map1_B x map2_E".
+
+        """
+
+        specstr = []
+        if ispec is not None:
+            (m0, m1) = mapind(self.nspec(), ispec)
+            return '{} x {}'.format(self.maplist[m0], self.maplist[m1])
+        else:
+            for (i,m0,m1) in specgen(self.nmap()):
+                specstr.append('{} x {}'.format(self.maplist[m0], self.maplist[m1]))
+        return specstr
