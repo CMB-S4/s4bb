@@ -124,8 +124,8 @@ def specgen(nmap):
 
 class MapDef():
     """
-    The MapDef object describes the properties of a map that is included in the
-    cross-spectral analysis.
+    The MapDef object describes the properties of a map (or maps).
+    It is also used to describe the map inputs to auto and cross spectra.
 
     """
 
@@ -139,14 +139,14 @@ class MapDef():
             Name of the map.
         field : string
             Specifies which field the map represents. Valid options are 'T',
-            'E', or 'B'.
+            'E', 'B', 'QU', or 'TQU'.
         bandpass : Bandpass object, optional
             Object describing the bandpass of the map.
 
         """
         
         self.name = name
-        assert field.upper() in ['T','E','B']
+        assert field.upper() in ['T','E','B','QU','TQU']
         self.field = field.upper()
         self.bandpass = bandpass
 
@@ -265,3 +265,46 @@ class XSpec():
             for (i,m0,m1) in specgen(self.nmap()):
                 specstr.append('{} x {}'.format(self.maplist[m0], self.maplist[m1]))
         return specstr
+
+class CalcSpec():
+    """
+    Base class for auto and cross spectrum estimators.
+
+    """
+
+    def __init__(self, maplist_in, bins):
+        self.maplist_in = maplist_in
+        self.make_maplist_out()
+        self.bins = bins
+
+    def make_maplist_out(self):
+        self.maplist_out = []
+        for m in self.maplist_in:
+            if m.field == 'T':
+                self.maplist_out.append(MapDef(m.name, 'T', m.bandpass))
+            elif m.field == 'QU':
+                self.maplist_out.append(MapDef(m.name, 'E', m.bandpass))
+                self.maplist_out.append(MapDef(m.name, 'B', m.bandpass))
+            elif m.field == 'TQU':
+                self.maplist_out.append(MapDef(m.name, 'T', m.bandpass))
+                self.maplist_out.append(MapDef(m.name, 'E', m.bandpass))
+                self.maplist_out.append(MapDef(m.name, 'B', m.bandpass))
+            else:
+                print('ERROR: input maps to CalcSpec must be T, QU, or TQU')
+                self.maplist_out = None
+
+    def nmap(self):
+        return len(self.maplist_out)
+
+    def nspec(self):
+        return self.nmap() * (self.nmap() + 1) // 2
+
+    def nbin(self):
+        return self.bins.shape[1]
+                
+    def calc(self, maps):
+        print('WARNING: CalcSpec base class shouldn''t be used!')
+        return XSpec(self.maplist_out, self.bins,
+                     np.zeros(shape=(self.nspec(), self.nbin(), 0)))
+    
+            
