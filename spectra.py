@@ -238,6 +238,12 @@ class XSpec():
         return XSpec(self.maplist, self.bins,
                      np.concatenate((self.spec, xspec.spec), axis=2))
 
+    def __getitem__(self, key):
+        return self.spec.__getitem__(key)
+
+    def __setitem__(self, key, value):
+        return self.spec.__setitem__(key, value)
+    
     def str(self, ispec=None):
         """
         List of spectra written in string format.

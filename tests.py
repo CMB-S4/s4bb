@@ -84,6 +84,11 @@ class SpectraTest(unittest.TestCase):
         self.assertTrue((xspec3.spec[:,:,0:nrlz1] == spec1).all())
         self.assertTrue((xspec3.spec[:,:,nrlz1:] == spec2).all())
 
+        # Test setitem, getitem
+        xspec3[0,1,2] = 37.0
+        self.assertEqual(xspec3[0,1,2], 37)
+        self.assertEqual(xspec3.spec[0,1,2], 37)
+
 class BandpassTest(unittest.TestCase):
     """
     Unit tests for bandpass.py
