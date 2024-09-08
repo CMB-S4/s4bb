@@ -89,6 +89,24 @@ class SpectraTest(unittest.TestCase):
         self.assertEqual(xspec3[0,1,2], 37)
         self.assertEqual(xspec3.spec[0,1,2], 37)
 
+        # Test select
+        # Downselect from 3 maps (6 spectra) to 2 maps (3 spectra)
+        spec4 = np.ones(shape=(6,self.nbin,1))
+        spec4[0,:,:] = 2.0**2 # m0 x m0
+        spec4[1,:,:] = 3.0**2 # m1 x m1
+        spec4[2,:,:] = 5.0**2 # m2 x m2
+        spec4[3,:,:] = 2.0 * 3.0 # m0 x m1
+        spec4[4,:,:] = 3.0 * 5.0 # m1 x m2
+        spec4[5,:,:] = 2.0 * 5.0 # m0 x m2
+        xspec4 = XSpec(self.maps[0:3], self.bins, spec4)
+        xspec5 = xspec4.select([self.maps[2], self.maps[0]], None)
+        self.assertEqual(xspec5.nmap(), 2)
+        self.assertEqual(xspec5.nbin(), xspec4.nbin())
+        self.assertEqual(xspec5.nrlz(), xspec4.nrlz())
+        self.assertTrue((xspec5[0,:,:] == xspec4[2,:,:]).all())
+        self.assertTrue((xspec5[1,:,:] == xspec4[0,:,:]).all())
+        self.assertTrue((xspec5[2,:,:] == xspec4[5,:,:]).all())
+
 class BandpassTest(unittest.TestCase):
     """
     Unit tests for bandpass.py

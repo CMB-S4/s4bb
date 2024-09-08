@@ -272,6 +272,47 @@ class XSpec():
                 specstr.append('{} x {}'.format(self.maplist[m0], self.maplist[m1]))
         return specstr
 
+    def select(self, maplist=None, ellind=None):
+        """
+        Make a new XSpec object with selected maps and/or ell bins.
+
+        Parameters
+        ----------
+        maplist : list of MapDef objects, optional
+            List of maps to use for the new XSpec object. Defaults to None,
+            which means that the new object will have the same map list as
+            the existing object.
+        ellind : list, optional
+            List of ell bins to keep for the new XSpec object. Ell bins are
+            specified by their integer index. Defaults to None, which means to
+            *keep all ell bins*.
+
+        Returns
+        -------
+        xspec_new : XSpec
+            New XSpec object with updated maps and ell bins.
+
+        """
+
+        # Process maplist argument.
+        if maplist is None:
+            # Not a deep copy, but I don't expect anyone to change the
+            # MapDef objects out from under me.
+            maplist = self.maplist.copy()
+            ispec = range(self.nspec())
+        else:
+            # Work out spec indices for new maplist.
+            ispec = [specind(self.nmap(), self.maplist.index(maplist[m0]),
+                             self.maplist.index(maplist[m1]))
+                     for (i,m0,m1) in specgen(len(maplist))]
+        # Process ellind argument.
+        if ellind is None:
+            ellind = range(self.nbin())
+
+        # Return new XSpec object with selected maps, ell bins
+        # Using .copy() for spectra data.
+        return XSpec(maplist, self.bins[:,ellind], self.spec[ispec,:,:].copy())
+
 class CalcSpec():
     """
     Base class for auto and cross spectrum estimators.

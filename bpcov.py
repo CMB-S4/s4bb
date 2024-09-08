@@ -168,17 +168,14 @@ class BpCov():
         """
         Make a new BpCov object with selected maps and/or ell bins.
 
-        This function can be used to downselect maps or ell bins from a BpCov
-        object.
-
         Parameters
         ----------
         maplist : list of MapDef objects, optional
-            List of maps to use for the new BPWF object. Defaults to None,
-            which means that the new BPWF object will have the same map list as
+            List of maps to use for the new BpCov object. Defaults to None,
+            which means that the new BpCov object will have the same map list as
             the existing object.
         ellind : list, optional
-            List of ell bins to keep for the new BPWF object. Ell bins are
+            List of ell bins to keep for the new BpCov object. Ell bins are
             specified by their integer index. Defaults to None, which means to
             *keep all ell bins*.
 
