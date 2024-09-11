@@ -384,6 +384,23 @@ class XSpec():
         # Using .copy() for spectra data.
         return XSpec(maplist, self.bins[:,ellind], self.spec[ispec,:,:].copy())
 
+def fix_map(map_):
+    """
+    Convert NaN, Inf, and hp.UNSEEN pixels to zero.
+
+    Operates on the input map(s) in place.
+
+    Parameters
+    ----------
+    map_ : array
+        Array containing one or more maps.
+
+    """
+
+    map_[np.isnan(map_)] = 0.0
+    map_[np.isinf(map_)] = 0.0
+    map_[map_ == hp.UNSEEN] = 0.0
+    
 class CalcSpec():
     """
     Base class for auto and cross spectrum estimators.
@@ -407,7 +424,7 @@ class CalcSpec():
 
     """
 
-    def __init__(self, maplist_in, bins, nside):
+    def __init__(self, maplist_in, bins, nside, use_Dl=True):
         """
         Create a new CalcSpec object.
 
@@ -423,7 +440,10 @@ class CalcSpec():
             ell bins are defined to be *inclusive* of the lower edge but
             *exclusive* of the upper edge.
         nside : int, power of 2
-            Healpix NSIDE used for *all* maps. 
+            Healpix NSIDE used for *all* maps.
+        use_Dl : bool, optional
+            By default, calculates Dl = l*(l+1)*Cl/(2*pi). Set argument to
+            false to calculate Cl.
 
         """
         
@@ -431,6 +451,7 @@ class CalcSpec():
         self.make_maplist_out()
         self.bins = bins
         self.nside = nside
+        self.use_Dl = use_Dl
 
     def make_maplist_out(self):
         """
@@ -500,3 +521,87 @@ class CalcSpec():
         assert len(maps) == len(self.maplist_in)
         return XSpec(self.maplist_out, self.bins,
                      np.zeros(shape=(self.nspec(), self.nbin(), 1)))
+
+class CalcSpec_healpy(CalcSpec):
+    """
+    Calculate power spectra using healpy tools.
+
+    """
+
+    def calc(self, maps, apod):
+        """
+        Calculates auto and cross spectra for apodized maps.
+
+        Parameters
+        ----------
+        maps : list of Healpix maps
+        apod : Healpix map or list of Healpix maps
+
+        Returns
+        -------
+        spec : XSpec object
+
+        """
+
+        # If apod is a numpy array, then this same apodization should be
+        # applied to all maps.
+        try:
+            apod.shape # throws an exception if apod is already a list
+            apod = [apod] * self.nmap() # convert to list by repetition
+        except: pass
+        # Process maps:
+        #   - Convert NaN, inf, hp.UNSEEN values to 0
+        #   - Make sure that they match mapdef_in
+        #   - Apply apodization and calculate alms
+        alm = []
+        for i in range(self.nmap()):
+            # Fixing NaN, inf, hp.UNSEEN values
+            # Is this a waste of time? Should we rely on the user to do it?
+            fix_map(maps[i])
+            fix_map(apod[i])
+            # Which alms to calculate depends on the input map field(s).
+            if self.maplist_in[i].field == 'T':
+                t_lm = hp.map2alm(maps[i] * apod[i])
+                # Rough fsky correction
+                t_lm = t_lm / np.sqrt(np.mean(apod[i]**2))
+                alm.append(t_lm)
+            elif self.maplist_in[i].field == 'QU':
+                assert (maps[i].shape[0] == 2)
+                # Combine QU maps with an empty T map
+                tqu = np.zeros(shape=(3,maps[i].shape[1]))
+                tqu[1:,:] = maps[i] * apod[i]
+                teb_lm = hp.map2alm(tqu, pol=True)
+                # Rough fsky correction
+                teb_lm = teb_lm / np.sqrt(np.mean(apod[i]**2))
+                alm.append(teb_lm[1])
+                alm.append(teb_lm[2])
+            elif self.maplist_in[i].field == 'TQU':
+                assert (maps[i].shape[0] == 3)
+                teb_lm = hp.map2alm(maps[i] * apod[i], pol=True)
+                # Rough fsky correction
+                teb_lm = teb_lm / np.sqrt(np.mean(apod[i]**2))
+                alm.append(teb_lm[0])
+                alm.append(teb_lm[1])
+                alm.append(teb_lm[2])
+            else:
+                raise ValueError('input maps to CalcSpec must be T, QU, or TQU')
+        # Calculate power spectra:
+        #   - Loop over output spectra and calculate Cl from alms
+        #   - Convert to Dl, if desired
+        #   - Divide by Bl
+        #   - Apply ell binning
+        spec = np.zeros(self.nspec(), self.nbin(), 1)
+        ell = np.arange(3 * self.nside)
+        Dlconv = ell * (ell + 1) / (2 * np.pi)
+        for (i,m0,m1) in specgen(self.nmap()):
+            Cl = hp.alm2cl(alm[m0], alm[m1])
+            # Cl -> Dl conversion but keep same variable name
+            if use_Dl: Cl = Cl * Dlconv
+            # Divide out beam window functions
+            Cl = Cl / self.maplist_in[m0].beam(3 * self.nside)
+            Cl = Cl / self.maplist_in[m1].beam(3 * self.nside)
+            # Apply ell binning
+            for j in range(self.nbin()):
+                spec[i,j,0] = Cl[self.bins[0,i]:self.bins[1,i]].mean()
+        # Return spectra as XSpec object.
+        return XSpec(self.maplist_out, self.bins, spec)
