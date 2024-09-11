@@ -363,41 +363,117 @@ class CalcSpec():
     """
     Base class for auto and cross spectrum estimators.
 
+    This object shouldn't be used, because it doesn't actually calculate power
+    spectra. Derived classes should include the following instance variables
+    and methods:
+    * maplist_in : instance variable containing a list of input maps, which
+                   can have field = 'T', 'QU', or 'TQU'
+    * bins       : instance variable listing the lower and upper edges of each
+                   ell bin, with shape=(2,nbin)
+    * make_maplist_out : method that provides a list of MapDef objects that
+                   define the ordering of calculated spectra. This method is
+                   implemented in the base class and can probably be reused by
+                   derived classes.
+    * nmap       : method that returns the length of the *output* maplist
+    * nspec      : method that returns the number of output spectra
+    * nbin       : method that returns the number of ell bins
+    * calc       : method that takes a list of input maps and returns an XSpec
+                   object containing the calculated output spectra
+
     """
 
-    def __init__(self, maplist_in, bins):
+    def __init__(self, maplist_in, bins, nside):
+        """
+        Create a new CalcSpec object.
+
+        Parameters
+        ----------
+        maplist_in : list of MapDef
+            This is a list that defines the maps that we will calculate auto
+            and cross spectra form. These input maps should have field set to
+            'T', 'QU', or 'TQU'.
+        bins : array, shape=(2,nbin)
+            Array containing the lower edges, in bins[0,:], and upper edges, in
+            bins[1,:], of each ell bin. Following the usual python convention,
+            ell bins are defined to be *inclusive* of the lower edge but
+            *exclusive* of the upper edge.
+        nside : int, power of 2
+            Healpix NSIDE used for *all* maps. 
+
+        """
+        
         self.maplist_in = maplist_in
         self.make_maplist_out()
         self.bins = bins
+        self.nside = nside
 
     def make_maplist_out(self):
+        """
+        Computes list of maps that define the output spectra.
+
+        This function is usually called in the constructor, immediately after
+        the input maplist is recorded.
+
+        When calculating the output maplist, this function assumes that we will
+        calculate all possible spectra from the input maps. So if the input
+        maplist contains one 'TQU' entry, there are six output spectra: TT, EE,
+        BB, TE, EB, and TB, and there are three output maps: T, E, B.
+
+        """
+        
         self.maplist_out = []
         for m in self.maplist_in:
             if m.field == 'T':
-                self.maplist_out.append(MapDef(m.name, 'T', m.bandpass))
+                self.maplist_out.append(MapDef(m.name, 'T', m.bandpass, m.Bl, m.fwhm_arcmin))
             elif m.field == 'QU':
-                self.maplist_out.append(MapDef(m.name, 'E', m.bandpass))
-                self.maplist_out.append(MapDef(m.name, 'B', m.bandpass))
+                self.maplist_out.append(MapDef(m.name, 'E', m.bandpass, m.Bl, m.fwhm_arcmin))
+                self.maplist_out.append(MapDef(m.name, 'B', m.bandpass, m.Bl, m.fwhm_arcmin))
             elif m.field == 'TQU':
-                self.maplist_out.append(MapDef(m.name, 'T', m.bandpass))
-                self.maplist_out.append(MapDef(m.name, 'E', m.bandpass))
-                self.maplist_out.append(MapDef(m.name, 'B', m.bandpass))
+                self.maplist_out.append(MapDef(m.name, 'T', m.bandpass, m.Bl, m.fwhm_arcmin))
+                self.maplist_out.append(MapDef(m.name, 'E', m.bandpass, m.Bl, m.fwhm_arcmin))
+                self.maplist_out.append(MapDef(m.name, 'B', m.bandpass, m.Bl, m.fwhm_arcmin))
             else:
-                print('ERROR: input maps to CalcSpec must be T, QU, or TQU')
-                self.maplist_out = None
+                raise ValueError('input maps to CalcSpec must be T, QU, or TQU')
 
     def nmap(self):
+        """Returns the number of maps in the output maplist"""
+        
         return len(self.maplist_out)
 
     def nspec(self):
+        """Returns the number of output spectra"""
+        
         return self.nmap() * (self.nmap() + 1) // 2
 
     def nbin(self):
+        """Returns the number of ell bins"""
+        
         return self.bins.shape[1]
                 
     def calc(self, maps):
+        """
+        Placeholder for function to calculate power spectra
+
+        Parameters
+        ----------
+        maps : list
+            This list should contain Healpix maps that match maplist_in. The
+            Healpix maps are arrays with shape=(nmap,npix). Each maplist_in
+            entry has field = 'T' (nmap=1), 'QU' (nmap=2), or 'TQU' (nmap=3).
+            The npix value should match the Healpix NSIDE defined in the
+            constructor.
+
+        Returns
+        -------
+        spec : XSpec object
+            Object containing an array of power spectra with shape
+            (nspec, nbin, 1).
+
+        """
+        
         print('WARNING: CalcSpec base class shouldn''t be used!')
+        assert len(maps) == len(self.maplist_in)
         return XSpec(self.maplist_out, self.bins,
-                     np.zeros(shape=(self.nspec(), self.nbin(), 0)))
+                     np.zeros(shape=(self.nspec(), self.nbin(), 1)))
     
-            
+
