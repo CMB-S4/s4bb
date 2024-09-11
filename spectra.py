@@ -129,7 +129,7 @@ class MapDef():
 
     """
 
-    def __init__(self, name, field, bandpass=None):
+    def __init__(self, name, field, bandpass=None, Bl=None, fwhm_arcmin=None):
         """
         Create a new MapDef object.
 
@@ -142,6 +142,15 @@ class MapDef():
             'E', 'B', 'QU', or 'TQU'.
         bandpass : Bandpass object, optional
             Object describing the bandpass of the map.
+        Bl : array, dtype=float, optional
+            Array specifying beam window function for this map. It is assumed
+            that this function starts at ell = 0 and extends up to
+            ell_max = len(Bl) - 1. If Bl is defined, then it supersedes the
+            `fwhm_arcmin` argument.
+        fwhm_arcmin : float, optional
+            Full-width at half maximum, in arc-minutes, to define a Gaussian
+            beam for this map. If the `Bl` argument is specified, then it
+            supersedes this value.
 
         """
         
@@ -149,6 +158,8 @@ class MapDef():
         assert field.upper() in ['T','E','B','QU','TQU']
         self.field = field.upper()
         self.bandpass = bandpass
+        self.Bl = Bl
+        self.fwhm_arcmin = fwhm_arcmin
 
     def __str__(self):
         return '{}_{}'.format(self.name, self.field)
@@ -161,6 +172,41 @@ class MapDef():
         """
         
         return (self.name == value.name) and (self.field == value.field)
+
+    def beam(self, ell_max):
+        """
+        Returns the beam window function for this map.
+
+        Parameters
+        ----------
+        ell_max : int
+            Maximum ell value for the beam window function.
+
+        Returns
+        -------
+        Bl : array, shape=(ell_max+1,), dtype=float
+            Beam window function defined starting at ell=0 and extending up to
+            ell=ell_max. If a beam is not defined for this map, the window
+            function returned will be all ones.
+        
+        """
+
+        # If Bl is defined, use that
+        if self.Bl is not None:
+            if len(self.Bl) > ell_max:
+                Bl = self.Bl[0:ell_max+1].copy()
+            else:
+                Bl = np.zeros(ell_max + 1)
+                Bl[0:len(self.Bl)] = self.Bl.copy()
+        # otherwise, calculate Gaussian Bl from FWHM
+        elif self.fwhm_arcmin is not None:
+            ell = np.arange(ell_max + 1)
+            sigma_rad = np.radians(self.fwhm_arcmin / 60) * np.sqrt(8 * np.log(2))
+            Bl = np.exp(-0.5 * ell**2 * sigma_rad**2)
+        # no beam defined
+        else:
+            Bl = np.ones(ell_max + 1)
+        return Bl
 
 class XSpec():
     """
