@@ -173,6 +173,31 @@ class MapDef():
         
         return (self.name == value.name) and (self.field == value.field)
 
+    def copy(self, update_field=None):
+        """
+        Returns a copy of the MapDef object.
+
+        Parameters
+        ----------
+        update_field : str, optional
+            By default, the returned MapDef object will have the same field
+            type as the current object. Use this optional argument to update to
+            a new field type.
+
+        Returns
+        -------
+        map_new : MapDef object
+            Copy of the current object (not a deep copy!).
+
+        """
+
+        if update_field is not None:
+            return MapDef(self.name, update_field, bandpass=self.bandpass,
+                          Bl=self.Bl, fwhm_arcmin=self.fwhm_arcmin)
+        else:
+            return MapDef(self.name, self.field, bandpass=self.bandpass,
+                          Bl=self.Bl, fwhm_arcmin=self.fwhm_arcmin)
+    
     def beam(self, ell_max):
         """
         Returns the beam window function for this map.
@@ -424,14 +449,14 @@ class CalcSpec():
         self.maplist_out = []
         for m in self.maplist_in:
             if m.field == 'T':
-                self.maplist_out.append(MapDef(m.name, 'T', m.bandpass, m.Bl, m.fwhm_arcmin))
+                self.maplist_out.append(m.copy())
             elif m.field == 'QU':
-                self.maplist_out.append(MapDef(m.name, 'E', m.bandpass, m.Bl, m.fwhm_arcmin))
-                self.maplist_out.append(MapDef(m.name, 'B', m.bandpass, m.Bl, m.fwhm_arcmin))
+                self.maplist_out.append(m.copy(update_field='E'))
+                self.maplist_out.append(m.copy(update_field='B'))
             elif m.field == 'TQU':
-                self.maplist_out.append(MapDef(m.name, 'T', m.bandpass, m.Bl, m.fwhm_arcmin))
-                self.maplist_out.append(MapDef(m.name, 'E', m.bandpass, m.Bl, m.fwhm_arcmin))
-                self.maplist_out.append(MapDef(m.name, 'B', m.bandpass, m.Bl, m.fwhm_arcmin))
+                self.maplist_out.append(m.copy(update_field='T'))
+                self.maplist_out.append(m.copy(update_field='E'))
+                self.maplist_out.append(m.copy(update_field='B'))
             else:
                 raise ValueError('input maps to CalcSpec must be T, QU, or TQU')
 
@@ -475,5 +500,3 @@ class CalcSpec():
         assert len(maps) == len(self.maplist_in)
         return XSpec(self.maplist_out, self.bins,
                      np.zeros(shape=(self.nspec(), self.nbin(), 1)))
-    
-
