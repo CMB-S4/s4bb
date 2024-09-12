@@ -6,6 +6,7 @@ Power spectra
 """
 
 import numpy as np
+import healpy as hp
 
 def specind(nmap, m0, m1):
     """
@@ -424,7 +425,7 @@ class CalcSpec():
 
     """
 
-    def __init__(self, maplist_in, bins, nside, use_Dl=True):
+    def __init__(self, maplist_in, apod, nside, bins, use_Dl=True):
         """
         Create a new CalcSpec object.
 
@@ -434,21 +435,33 @@ class CalcSpec():
             This is a list that defines the maps that we will calculate auto
             and cross spectra form. These input maps should have field set to
             'T', 'QU', or 'TQU'.
+        apod : Healpix map or list of Healpix maps
+            Apodization that will be used to weight maps before transform.
+            If a single Healpix map is supplied, then the same apodization
+            will be used for all maps. The alternative is to supply a list of
+            apodization maps, one for each entry in maplist_in.
+        nside : int, power of 2
+            Healpix NSIDE used for *all* maps.
         bins : array, shape=(2,nbin)
             Array containing the lower edges, in bins[0,:], and upper edges, in
             bins[1,:], of each ell bin. Following the usual python convention,
             ell bins are defined to be *inclusive* of the lower edge but
             *exclusive* of the upper edge.
-        nside : int, power of 2
-            Healpix NSIDE used for *all* maps.
         use_Dl : bool, optional
             By default, calculates Dl = l*(l+1)*Cl/(2*pi). Set argument to
-            false to calculate Cl.
+            false to calculate Cl instead.
 
         """
         
         self.maplist_in = maplist_in
         self.make_maplist_out()
+        # If apod is a numpy array, then this same apodization should be
+        # applied to all maps.
+        try:
+            apod.shape # throws an exception if apod is already a list
+            self.apod = [apod] * self.nmap() # convert to list by repetition
+        except:
+            self.apod = apod
         self.bins = bins
         self.nside = nside
         self.use_Dl = use_Dl
@@ -518,7 +531,6 @@ class CalcSpec():
         """
         
         print('WARNING: CalcSpec base class shouldn''t be used!')
-        assert len(maps) == len(self.maplist_in)
         return XSpec(self.maplist_out, self.bins,
                      np.zeros(shape=(self.nspec(), self.nbin(), 1)))
 
@@ -528,14 +540,13 @@ class CalcSpec_healpy(CalcSpec):
 
     """
 
-    def calc(self, maps, apod):
+    def calc(self, maps):
         """
         Calculates auto and cross spectra for apodized maps.
 
         Parameters
         ----------
         maps : list of Healpix maps
-        apod : Healpix map or list of Healpix maps
 
         Returns
         -------
@@ -543,46 +554,39 @@ class CalcSpec_healpy(CalcSpec):
 
         """
 
-        # If apod is a numpy array, then this same apodization should be
-        # applied to all maps.
-        try:
-            apod.shape # throws an exception if apod is already a list
-            apod = [apod] * self.nmap() # convert to list by repetition
-        except: pass
         # Process maps:
         #   - Convert NaN, inf, hp.UNSEEN values to 0
         #   - Make sure that they match mapdef_in
         #   - Apply apodization and calculate alms
         alm = []
-        for i in range(self.nmap()):
+        for i in range(len(maps)):
             # Fixing NaN, inf, hp.UNSEEN values
             # Is this a waste of time? Should we rely on the user to do it?
             fix_map(maps[i])
-            fix_map(apod[i])
             # Which alms to calculate depends on the input map field(s).
             if self.maplist_in[i].field == 'T':
-                t_lm = hp.map2alm(maps[i] * apod[i])
+                t_lm = hp.map2alm(maps[i] * self.apod[i])
                 # Rough fsky correction
-                t_lm = t_lm / np.sqrt(np.mean(apod[i]**2))
+                t_lm = t_lm / np.sqrt(np.mean(self.apod[i]**2))
                 alm.append(t_lm)
             elif self.maplist_in[i].field == 'QU':
                 assert (maps[i].shape[0] == 2)
                 # Combine QU maps with an empty T map
                 tqu = np.zeros(shape=(3,maps[i].shape[1]))
-                tqu[1:,:] = maps[i] * apod[i]
+                tqu[1:,:] = maps[i] * self.apod[i]
                 teb_lm = hp.map2alm(tqu, pol=True)
                 # Rough fsky correction
-                teb_lm = teb_lm / np.sqrt(np.mean(apod[i]**2))
-                alm.append(teb_lm[1])
-                alm.append(teb_lm[2])
+                teb_lm = teb_lm / np.sqrt(np.mean(self.apod[i]**2))
+                alm.append(teb_lm[1])  # E_lm
+                alm.append(teb_lm[2])  # B_lm
             elif self.maplist_in[i].field == 'TQU':
                 assert (maps[i].shape[0] == 3)
-                teb_lm = hp.map2alm(maps[i] * apod[i], pol=True)
+                teb_lm = hp.map2alm(maps[i] * self.apod[i], pol=True)
                 # Rough fsky correction
-                teb_lm = teb_lm / np.sqrt(np.mean(apod[i]**2))
-                alm.append(teb_lm[0])
-                alm.append(teb_lm[1])
-                alm.append(teb_lm[2])
+                teb_lm = teb_lm / np.sqrt(np.mean(self.apod[i]**2))
+                alm.append(teb_lm[0]) # T_lm
+                alm.append(teb_lm[1]) # E_lm
+                alm.append(teb_lm[2]) # B_lm
             else:
                 raise ValueError('input maps to CalcSpec must be T, QU, or TQU')
         # Calculate power spectra:
@@ -590,18 +594,18 @@ class CalcSpec_healpy(CalcSpec):
         #   - Convert to Dl, if desired
         #   - Divide by Bl
         #   - Apply ell binning
-        spec = np.zeros(self.nspec(), self.nbin(), 1)
+        spec = np.zeros(shape=(self.nspec(),self.nbin(),1))
         ell = np.arange(3 * self.nside)
         Dlconv = ell * (ell + 1) / (2 * np.pi)
         for (i,m0,m1) in specgen(self.nmap()):
             Cl = hp.alm2cl(alm[m0], alm[m1])
             # Cl -> Dl conversion but keep same variable name
-            if use_Dl: Cl = Cl * Dlconv
+            if self.use_Dl: Cl = Cl * Dlconv
             # Divide out beam window functions
-            Cl = Cl / self.maplist_in[m0].beam(3 * self.nside)
-            Cl = Cl / self.maplist_in[m1].beam(3 * self.nside)
+            Cl = Cl / self.maplist_out[m0].beam(len(Cl) - 1)
+            Cl = Cl / self.maplist_out[m1].beam(len(Cl) - 1)
             # Apply ell binning
             for j in range(self.nbin()):
-                spec[i,j,0] = Cl[self.bins[0,i]:self.bins[1,i]].mean()
+                spec[i,j,0] = Cl[self.bins[0,j]:self.bins[1,j]].mean()
         # Return spectra as XSpec object.
         return XSpec(self.maplist_out, self.bins, spec)
