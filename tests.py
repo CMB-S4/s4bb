@@ -7,8 +7,10 @@ Unit Tests
 
 import unittest
 import numpy as np
+import healpy as hp
 
 from spectra import specind, mapind, specgen, MapDef, XSpec
+from spectra import CalcSpec, CalcSpec_healpy
 from bandpass import Bandpass
 from bpwf import BPWF
 from bpcov import BpCov
@@ -107,6 +109,81 @@ class SpectraTest(unittest.TestCase):
         self.assertTrue((xspec5[1,:,:] == xspec4[0,:,:]).all())
         self.assertTrue((xspec5[2,:,:] == xspec4[5,:,:]).all())
 
+    def test_CalcSpec(self):
+        """Test CalcSpec base class"""
+
+        m0 = MapDef('m0', 'T')
+        m1 = MapDef('m1', 'QU')
+        m2 = MapDef('m2', 'TQU')
+        nside = 128
+        apod = np.ones(hp.nside2npix(nside))
+        cs = CalcSpec([m0, m1, m2], apod, nside, self.bins)
+        # Check that maplist_out is as expected.
+        self.assertEqual(cs.nmap(), 6)
+        self.assertEqual(cs.maplist_out[0], MapDef('m0', 'T'))
+        self.assertEqual(cs.maplist_out[1], MapDef('m1', 'E'))
+        self.assertEqual(cs.maplist_out[2], MapDef('m1', 'B'))
+        self.assertEqual(cs.maplist_out[3], MapDef('m2', 'T'))
+        self.assertEqual(cs.maplist_out[4], MapDef('m2', 'E'))
+        self.assertEqual(cs.maplist_out[5], MapDef('m2', 'B'))
+
+    def test_CalcSpec_healpy(self):
+        """Test CalcSpec_healpy"""
+
+        # Check that we get the sensible power spectrum measurements.
+        m0 = MapDef('m0', 'TQU')
+        Cl = [8.0, 4.0, 1.0, 2.0] # TT, EE, BB, TE; white spectra
+        # Try three values of NSIDE
+        for nside in [64,128,256]:
+            # Set up CalcSpec_healpy object
+            apod = np.ones(hp.nside2npix(nside))
+            bins = np.array([[10], [2 * nside]]) # one big ell bin
+            cs = CalcSpec_healpy([m0], apod, nside, bins, use_Dl=False)
+            # Generate input maps
+            tqu = hp.synfast((Cl * np.ones(shape=(3*nside,4))).transpose(),
+                             nside, new=True)
+            # Calculate spectra
+            spec = cs.calc([tqu])
+            # Compare output spectra to the input power levels with appropriate
+            # tolerance (5 sigma).
+            tol = 5.0
+            self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < tol * np.sqrt(2) * Cl[0] / (2 * nside))
+            self.assertTrue(np.abs(Cl[1] - spec[1,0,0]) < tol * np.sqrt(2) * Cl[1] / (2 * nside))
+            self.assertTrue(np.abs(Cl[2] - spec[2,0,0]) < tol * np.sqrt(2) * Cl[2] / (2 * nside))
+            self.assertTrue(np.abs(Cl[3] - spec[3,0,0]) < tol * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside))
+            self.assertTrue(np.abs(spec[4,0,0]) < tol * np.sqrt(Cl[1] * Cl[2]) / (2 * nside))
+            self.assertTrue(np.abs(spec[5,0,0]) < tol * np.sqrt(Cl[0] * Cl[2]) / (2 * nside))
+
+        # Check that we get sensible power spectrum measurements with different
+        # sky cuts / apodization masks. Note that CalcSpec_healpy does not
+        # include a pure-B estimator, so for this test we will set BB=0 and
+        # just check the output TT, EE, and TE power.
+        Cl = [8.0, 4.0, 0.0, 2.0] # TT, EE, BB, TE; white spectra
+        nside = 128
+        bins = np.array([[10], [2 * nside]]) # one big ell bin
+        (theta, phi) = hp.pix2ang(nside, range(hp.nside2npix(nside)))
+        apod_options = []
+        apod_options.append((theta < np.pi / 4).astype(float))
+        apod_options.append((theta < np.pi / 6).astype(float))
+        apod_options.append((theta < np.pi / 8).astype(float))
+        apod_options.append((theta / np.pi)**2)
+        apod_options.append((2 * (theta - np.pi / 2) / np.pi)**2)
+        for apod in apod_options:
+            # Set up CalcSpec_healpy object
+            cs = CalcSpec_healpy([m0], apod, nside, bins, use_Dl=False)
+            # Generate input maps
+            tqu = hp.synfast((Cl * np.ones(shape=(3*nside,4))).transpose(),
+                             nside, new=True)
+            # Calculate spectra
+            spec = cs.calc([tqu])
+            # Compare output spectra to the input power levels with appropriate
+            # tolerance (5 sigma).
+            fsky = np.mean(apod**2)**2 / np.mean(apod**4) # effective fsky for mask
+            tol = 5.0
+            self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < tol * np.sqrt(2) * Cl[0] / (2 * nside) / np.sqrt(fsky))
+            self.assertTrue(np.abs(Cl[1] - spec[1,0,0]) < tol * np.sqrt(2) * Cl[1] / (2 * nside) / np.sqrt(fsky))
+            self.assertTrue(np.abs(Cl[3] - spec[3,0,0]) < tol * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside) / np.sqrt(fsky))
+        
 class BandpassTest(unittest.TestCase):
     """
     Unit tests for bandpass.py
