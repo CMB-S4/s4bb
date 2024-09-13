@@ -15,6 +15,12 @@ from bandpass import Bandpass
 from bpwf import BPWF
 from bpcov import BpCov
 
+# Some of the tests involve generating maps, calculating power spectra, and
+# checking that we recover the input spectra. This involves sample variance,
+# so we need to specify a tolerance for the test, expressed here in units of
+# sigma.
+TOL = 5.0
+
 class SpectraTest(unittest.TestCase):
     """
     Unit tests for spectra.py
@@ -144,15 +150,13 @@ class SpectraTest(unittest.TestCase):
                              nside, new=True)
             # Calculate spectra
             spec = cs.calc([tqu])
-            # Compare output spectra to the input power levels with appropriate
-            # tolerance (5 sigma).
-            tol = 5.0
-            self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < tol * np.sqrt(2) * Cl[0] / (2 * nside))
-            self.assertTrue(np.abs(Cl[1] - spec[1,0,0]) < tol * np.sqrt(2) * Cl[1] / (2 * nside))
-            self.assertTrue(np.abs(Cl[2] - spec[2,0,0]) < tol * np.sqrt(2) * Cl[2] / (2 * nside))
-            self.assertTrue(np.abs(Cl[3] - spec[3,0,0]) < tol * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside))
-            self.assertTrue(np.abs(spec[4,0,0]) < tol * np.sqrt(Cl[1] * Cl[2]) / (2 * nside))
-            self.assertTrue(np.abs(spec[5,0,0]) < tol * np.sqrt(Cl[0] * Cl[2]) / (2 * nside))
+            # Compare output spectra to the input power levels.
+            self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < TOL * np.sqrt(2) * Cl[0] / (2 * nside))
+            self.assertTrue(np.abs(Cl[1] - spec[1,0,0]) < TOL * np.sqrt(2) * Cl[1] / (2 * nside))
+            self.assertTrue(np.abs(Cl[2] - spec[2,0,0]) < TOL * np.sqrt(2) * Cl[2] / (2 * nside))
+            self.assertTrue(np.abs(Cl[3] - spec[3,0,0]) < TOL * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside))
+            self.assertTrue(np.abs(spec[4,0,0]) < TOL * np.sqrt(Cl[1] * Cl[2]) / (2 * nside))
+            self.assertTrue(np.abs(spec[5,0,0]) < TOL * np.sqrt(Cl[0] * Cl[2]) / (2 * nside))
 
         # Check that we get sensible power spectrum measurements with different
         # sky cuts / apodization masks. Note that CalcSpec_healpy does not
@@ -176,13 +180,11 @@ class SpectraTest(unittest.TestCase):
                              nside, new=True)
             # Calculate spectra
             spec = cs.calc([tqu])
-            # Compare output spectra to the input power levels with appropriate
-            # tolerance (5 sigma).
+            # Compare output spectra to the input power levels.
             fsky = np.mean(apod**2)**2 / np.mean(apod**4) # effective fsky for mask
-            tol = 5.0
-            self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < tol * np.sqrt(2) * Cl[0] / (2 * nside) / np.sqrt(fsky))
-            self.assertTrue(np.abs(Cl[1] - spec[1,0,0]) < tol * np.sqrt(2) * Cl[1] / (2 * nside) / np.sqrt(fsky))
-            self.assertTrue(np.abs(Cl[3] - spec[3,0,0]) < tol * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside) / np.sqrt(fsky))
+            self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < TOL * np.sqrt(2) * Cl[0] / (2 * nside) / np.sqrt(fsky))
+            self.assertTrue(np.abs(Cl[1] - spec[1,0,0]) < TOL * np.sqrt(2) * Cl[1] / (2 * nside) / np.sqrt(fsky))
+            self.assertTrue(np.abs(Cl[3] - spec[3,0,0]) < TOL * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside) / np.sqrt(fsky))
 
     def test_CalcSpec_namaster(self):
         """Test CalcSpec_namaster"""
@@ -201,16 +203,117 @@ class SpectraTest(unittest.TestCase):
                              nside, new=True)
             # Calculate spectra
             spec = cs.calc([tqu])
-            # Compare output spectra to the input power levels with appropriate
-            # tolerance (5 sigma).
-            tol = 5.0
-            self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < tol * np.sqrt(2) * Cl[0] / (2 * nside))
-            self.assertTrue(np.abs(Cl[1] - spec[1,0,0]) < tol * np.sqrt(2) * Cl[1] / (2 * nside))
-            self.assertTrue(np.abs(Cl[2] - spec[2,0,0]) < tol * np.sqrt(2) * Cl[2] / (2 * nside))
-            self.assertTrue(np.abs(Cl[3] - spec[3,0,0]) < tol * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside))
-            self.assertTrue(np.abs(spec[4,0,0]) < tol * np.sqrt(Cl[1] * Cl[2]) / (2 * nside))
-            self.assertTrue(np.abs(spec[5,0,0]) < tol * np.sqrt(Cl[0] * Cl[2]) / (2 * nside))
-            
+            # Compare output spectra to the input power levels.
+            self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < TOL * np.sqrt(2) * Cl[0] / (2 * nside))
+            self.assertTrue(np.abs(Cl[1] - spec[1,0,0]) < TOL * np.sqrt(2) * Cl[1] / (2 * nside))
+            self.assertTrue(np.abs(Cl[2] - spec[2,0,0]) < TOL * np.sqrt(2) * Cl[2] / (2 * nside))
+            self.assertTrue(np.abs(Cl[3] - spec[3,0,0]) < TOL * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside))
+            self.assertTrue(np.abs(spec[4,0,0]) < TOL * np.sqrt(Cl[1] * Cl[2]) / (2 * nside))
+            self.assertTrue(np.abs(spec[5,0,0]) < TOL * np.sqrt(Cl[0] * Cl[2]) / (2 * nside))
+
+        # Test that we properly handle different combinations of T, QU, or TQU
+        # input maps.
+        m0 = MapDef('m0', 'TQU')
+        m1 = MapDef('m1', 'T')
+        m2 = MapDef('m2', 'QU')
+        # Just work at one value of NSIDE
+        nside = 128
+        apod = np.ones(hp.nside2npix(nside))
+        bins = np.array([[10], [2 * nside]]) # one big ell bin
+        # Remake TQU map at this NSIDE
+        tqu = hp.synfast((Cl * np.ones(shape=(3*nside,4))).transpose(),
+                         nside, new=True)
+        # Independent TQU sim with same input spectrum.
+        tqu2 = hp.synfast((Cl * np.ones(shape=(3*nside,4))).transpose(),
+                          nside, new=True)
+        t = tqu2[0,:]
+        qu = tqu2[1:,:]
+        # T only ------
+        cs = CalcSpec_namaster([m1], apod, nside, bins, use_Dl=False, pure_B=False)
+        spec = cs.calc([t])
+        self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < TOL * np.sqrt(2) * Cl[0] / (2 * nside))
+        # QU only -----
+        cs = CalcSpec_namaster([m2], apod, nside, bins, use_Dl=False, pure_B=False)
+        spec = cs.calc([qu])
+        self.assertTrue(np.abs(Cl[1] - spec[0,0,0]) < TOL * np.sqrt(2) * Cl[1] / (2 * nside))
+        self.assertTrue(np.abs(Cl[2] - spec[1,0,0]) < TOL * np.sqrt(2) * Cl[2] / (2 * nside))
+        self.assertTrue(np.abs(spec[2,0,0]) < TOL * np.sqrt(Cl[1] * Cl[2]) / (2 * nside))
+        # T, QU -------
+        cs = CalcSpec_namaster([m1, m2], apod, nside, bins, use_Dl=False, pure_B=False)
+        spec = cs.calc([t, qu])
+        self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < TOL * np.sqrt(2) * Cl[0] / (2 * nside))
+        self.assertTrue(np.abs(Cl[1] - spec[1,0,0]) < TOL * np.sqrt(2) * Cl[1] / (2 * nside))
+        self.assertTrue(np.abs(Cl[2] - spec[2,0,0]) < TOL * np.sqrt(2) * Cl[2] / (2 * nside))
+        self.assertTrue(np.abs(Cl[3] - spec[3,0,0]) < TOL * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside))
+        self.assertTrue(np.abs(spec[4,0,0]) < TOL * np.sqrt(Cl[1] * Cl[2]) / (2 * nside))
+        self.assertTrue(np.abs(spec[5,0,0]) < TOL * np.sqrt(Cl[0] * Cl[2]) / (2 * nside))        
+        # QU, T -------
+        cs = CalcSpec_namaster([m2, m1], apod, nside, bins, use_Dl=False, pure_B=False)
+        spec = cs.calc([qu, t])
+        self.assertTrue(np.abs(Cl[1] - spec[0,0,0]) < TOL * np.sqrt(2) * Cl[1] / (2 * nside))
+        self.assertTrue(np.abs(Cl[2] - spec[1,0,0]) < TOL * np.sqrt(2) * Cl[2] / (2 * nside))
+        self.assertTrue(np.abs(Cl[0] - spec[2,0,0]) < TOL * np.sqrt(2) * Cl[0] / (2 * nside))
+        self.assertTrue(np.abs(spec[3,0,0]) < TOL * np.sqrt(Cl[1] * Cl[2]) / (2 * nside))
+        self.assertTrue(np.abs(spec[4,0,0]) < TOL * np.sqrt(Cl[0] * Cl[2]) / (2 * nside))
+        self.assertTrue(np.abs(Cl[3] - spec[5,0,0]) < TOL * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside))
+        # TQU, T, QU --
+        cs = CalcSpec_namaster([m0, m1, m2], apod, nside, bins, use_Dl=False, pure_B=False)
+        spec = cs.calc([tqu, t, qu])
+        self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < TOL * np.sqrt(2) * Cl[0] / (2 * nside))
+        self.assertTrue(np.abs(Cl[1] - spec[1,0,0]) < TOL * np.sqrt(2) * Cl[1] / (2 * nside))
+        self.assertTrue(np.abs(Cl[2] - spec[2,0,0]) < TOL * np.sqrt(2) * Cl[2] / (2 * nside))
+        self.assertTrue(np.abs(Cl[0] - spec[3,0,0]) < TOL * np.sqrt(2) * Cl[0] / (2 * nside))
+        self.assertTrue(np.abs(Cl[1] - spec[4,0,0]) < TOL * np.sqrt(2) * Cl[1] / (2 * nside))
+        self.assertTrue(np.abs(Cl[2] - spec[5,0,0]) < TOL * np.sqrt(2) * Cl[2] / (2 * nside))
+        self.assertTrue(np.abs(Cl[3] - spec[6,0,0]) < TOL * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside))
+        self.assertTrue(np.abs(spec[7,0,0]) < TOL * np.sqrt(Cl[1] * Cl[2]) / (2 * nside))
+        self.assertTrue(np.abs(spec[8,0,0]) < TOL * np.sqrt(Cl[0] * Cl[2]) / (2 * nside))
+        self.assertTrue(np.abs(Cl[3] - spec[9,0,0]) < TOL * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside))
+        self.assertTrue(np.abs(spec[10,0,0]) < TOL * np.sqrt(Cl[1] * Cl[2]) / (2 * nside))
+        self.assertTrue(np.abs(spec[11,0,0]) < TOL * np.sqrt(Cl[0] * Cl[2]) / (2 * nside))
+        self.assertTrue(np.abs(spec[12,0,0]) < TOL * np.sqrt(Cl[0] * Cl[1]) / (2 * nside))
+        self.assertTrue(np.abs(spec[13,0,0]) < TOL * np.sqrt(Cl[1] * Cl[2]) / (2 * nside))
+        self.assertTrue(np.abs(spec[14,0,0]) < TOL * np.sqrt(Cl[0] * Cl[2]) / (2 * nside))
+        self.assertTrue(np.abs(spec[15,0,0]) < TOL * Cl[0] / (2 * nside))
+        self.assertTrue(np.abs(spec[16,0,0]) < TOL * Cl[1] / (2 * nside))
+        self.assertTrue(np.abs(spec[17,0,0]) < TOL * Cl[2] / (2 * nside))
+        self.assertTrue(np.abs(spec[18,0,0]) < TOL * np.sqrt(Cl[0] * Cl[1]) / (2 * nside))
+        self.assertTrue(np.abs(spec[19,0,0]) < TOL * np.sqrt(Cl[1] * Cl[2]) / (2 * nside))
+        self.assertTrue(np.abs(spec[20,0,0]) < TOL * np.sqrt(Cl[0] * Cl[2]) / (2 * nside))
+
+        # Check that we get sensible power spectrum measurements with different
+        # sky cuts / apodization masks. Turn on the NaMaster pure-B estimator
+        # to deal with E->B leakage. Keep BB << EE so that we don't have to
+        # worry about B->E.
+        Cl = [8.0, 4.0, 0.1, 2.0] # TT, EE, BB, TE; white spectra
+        m0 = MapDef('m0', 'TQU')
+        nside = 128
+        bins = np.array([[10], [2 * nside]]) # one big ell bin
+        # Generate input maps
+        tqu = hp.synfast((Cl * np.ones(shape=(3*nside,4))).transpose(),
+                        nside, new=True)
+        # Try some different apodizations. These should all be smooth enough
+        # to work well with pure-B estimator.
+        (theta, phi) = hp.pix2ang(nside, range(hp.nside2npix(nside)))
+        apod_options = []
+        apod_options.append(np.cos(theta)**2)
+        apod_options.append(np.cos(2 * theta)**2)
+        apod_options.append(np.cos(3 * theta)**2)
+        apod_options.append(np.cos(4 * theta)**2)
+        for apod in apod_options:
+            # Set up CalcSpec_healpy object
+            cs = CalcSpec_namaster([m0], apod, nside, bins, use_Dl=False, pure_B=True)
+            # Calculate spectra
+            spec = cs.calc([tqu])
+            # Compare output spectra to the input power levels.
+            fsky = np.mean(apod**2)**2 / np.mean(apod**4) # effective fsky for mask
+            self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < TOL * np.sqrt(2) * Cl[0] / (2 * nside) / np.sqrt(fsky))
+            self.assertTrue(np.abs(Cl[1] - spec[1,0,0]) < TOL * np.sqrt(2) * Cl[1] / (2 * nside) / np.sqrt(fsky))
+            self.assertTrue(np.abs(Cl[2] - spec[2,0,0]) < TOL * np.sqrt(2) * Cl[2] / (2 * nside) / np.sqrt(fsky))
+            self.assertTrue(np.abs(Cl[3] - spec[3,0,0]) < TOL * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside) / np.sqrt(fsky))
+            self.assertTrue(np.abs(spec[4,0,0]) < TOL * np.sqrt(Cl[1] * Cl[2]) / (2 * nside) / np.sqrt(fsky))
+            self.assertTrue(np.abs(spec[5,0,0]) < TOL * np.sqrt(Cl[0] * Cl[2]) / (2 * nside) / np.sqrt(fsky))
+        
 class BandpassTest(unittest.TestCase):
     """
     Unit tests for bandpass.py

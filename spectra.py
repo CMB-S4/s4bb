@@ -640,7 +640,22 @@ class CalcSpec_namaster(CalcSpec):
             self.pure_B = [pure_B] * len(maplist_in)
 
         # NaMaster binning operator
-        self.nmt_bin = nmt.NmtBin.from_edges(self.bins[0,:], self.bins[1,:],
+        # There seems to be a bug(s) in NaMaster that causes the following issues:
+        # 1. It is necessary to set lmax for the NmtField objects equal to lmax
+        #    from the NmtBin object. This might not be a bug, but I'm not sure
+        #    of the reason behind it.
+        # 2. When creating a spin-2 field with purify_b=True, it will throw an
+        #    error for any lmax other than the default (3*NSIDE-1).
+        # I created an issue on the NaMaster github here:
+        #    https://github.com/LSSTDESC/NaMaster/issues/211
+        # In the meantime, we are going to add a junk bin that extends up to
+        # the right lmax, then throw away that bandpower after calculating
+        # spectra.
+        # Not currently checking for the possibility that bin edges extend to
+        # ell > 3*NSIDE-1.
+        bin_low = np.concatenate((self.bins[0,:], [self.bins[1,-1]]))
+        bin_high = np.concatenate((self.bins[1,:], [3 * self.nside]))
+        self.nmt_bin = nmt.NmtBin.from_edges(bin_low, bin_high,
                                              is_Dell=self.use_Dl)
             
         # Set up NaMaster workspaces for power spectrum calculation.
@@ -696,48 +711,57 @@ class CalcSpec_namaster(CalcSpec):
         map_index = []
         counter = 0
         for i in range(len(self.maplist_in)):
+            # Need to separately handle cases where maps[i] is None
             if self.maplist_in[i].field == 'T':
                 # Add a spin-0 field to list.
-                T = nmt.NmtField(self.apod[i], [maps[i]], spin=0,
-                                 beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
-                                 lmax=self.nmt_bin.lmax)
-                fields.append(T)
-                map_index.append([counter])
-                counter += 1
-            elif self.maplist_in[i].field == 'QU':
-                # Add a spin-2 field to list.
-                QU = nmt.NmtField(self.apod[i], [maps[i][0], maps[i][1]], spin=2,
-                                  beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
-                                  lmax=self.nmt_bin.lmax,
-                                  purify_b=self.pure_B[i])
-                fields.append(QU)
-                map_index.append([counter, counter+1])
-                counter += 2              
-            elif self.maplist_in[i].field == 'TQU':
-                # Need to add both spin-0 and spin-2 fields.
-                # Try/except blocks to handle case where maps[i] = None
-                try: 
-                    T = nmt.NmtField(self.apod[i], [maps[i][0]], spin=0,
+                if maps[i] is not None:
+                    T = nmt.NmtField(self.apod[i], [maps[i]], spin=0,
                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
                                      lmax=self.nmt_bin.lmax)
-                except TypeError:
+                else:
                     T = nmt.NmtField(self.apod[i], None, spin=0,
                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
                                      lmax=self.nmt_bin.lmax)
                 fields.append(T)
                 map_index.append([counter])
-                try:
+                counter += 1
+            elif self.maplist_in[i].field == 'QU':
+                # Add a spin-2 field to list.
+                if maps[i] is not None:
+                    QU = nmt.NmtField(self.apod[i], [maps[i][0], maps[i][1]], spin=2,
+                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                      lmax=self.nmt_bin.lmax,
+                                      purify_b=self.pure_B[i])
+                else:
+                    QU = nmt.NmtField(self.apod[i], None, spin=2,
+                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                      lmax=self.nmt_bin.lmax,
+                                      purify_b=self.pure_B[i])
+                fields.append(QU)
+                map_index.append([counter, counter + 1])
+                counter += 2              
+            elif self.maplist_in[i].field == 'TQU':
+                # Need to add both spin-0 and spin-2 fields.
+                if maps[i] is not None:
+                    T = nmt.NmtField(self.apod[i], [maps[i][0]], spin=0,
+                                     beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                     lmax=self.nmt_bin.lmax)
                     QU = nmt.NmtField(self.apod[i], [maps[i][1], maps[i][2]], spin=2, 
                                       beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
                                       lmax=self.nmt_bin.lmax,
                                       purify_b=self.pure_B[i])
-                except TypeError:
+                else:
+                    T = nmt.NmtField(self.apod[i], None, spin=0,
+                                     beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                     lmax=self.nmt_bin.lmax)
                     QU = nmt.NmtField(self.apod[i], None, spin=2, 
                                       beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
                                       lmax=self.nmt_bin.lmax,
                                       purify_b=self.pure_B[i])                    
+                fields.append(T)
+                map_index.append([counter])
                 fields.append(QU)
-                map_index.append([counter+1, counter+2])
+                map_index.append([counter + 1, counter + 2])
                 counter += 3
             else:
                 raise ValueError('input maps to CalcSpec must be T, QU, or TQU')
@@ -767,6 +791,6 @@ class CalcSpec_namaster(CalcSpec):
             cl_decoupled = self.workspaces[i].decouple_cell(cl_coupled)
             # Rearrange NaMaster spectra to follow our spectra ordering.
             for j in range(len(self.spec_index[i])):
-                spec[self.spec_index[i][j],:,0] = cl_decoupled[j,:]
+                spec[self.spec_index[i][j],:,0] = cl_decoupled[j,0:self.nbin()]
         # Return spectra as XSpec object.
         return XSpec(self.maplist_out, self.bins, spec)
