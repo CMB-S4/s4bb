@@ -10,7 +10,7 @@ import numpy as np
 import healpy as hp
 
 from spectra import specind, mapind, specgen, MapDef, XSpec
-from spectra import CalcSpec, CalcSpec_healpy
+from spectra import CalcSpec, CalcSpec_healpy, CalcSpec_namaster
 from bandpass import Bandpass
 from bpwf import BPWF
 from bpcov import BpCov
@@ -183,7 +183,34 @@ class SpectraTest(unittest.TestCase):
             self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < tol * np.sqrt(2) * Cl[0] / (2 * nside) / np.sqrt(fsky))
             self.assertTrue(np.abs(Cl[1] - spec[1,0,0]) < tol * np.sqrt(2) * Cl[1] / (2 * nside) / np.sqrt(fsky))
             self.assertTrue(np.abs(Cl[3] - spec[3,0,0]) < tol * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside) / np.sqrt(fsky))
-        
+
+    def test_CalcSpec_namaster(self):
+        """Test CalcSpec_namaster"""
+
+        # Check that we get the sensible power spectrum measurements.
+        m0 = MapDef('m0', 'TQU')
+        Cl = [8.0, 4.0, 1.0, 2.0] # TT, EE, BB, TE; white spectra
+        # Try three values of NSIDE
+        for nside in [64,128,256]:
+            # Set up CalcSpec_namaster object
+            apod = np.ones(hp.nside2npix(nside))
+            bins = np.array([[10], [2 * nside]]) # one big ell bin
+            cs = CalcSpec_namaster([m0], apod, nside, bins, use_Dl=False, pure_B=False)
+            # Generate input maps
+            tqu = hp.synfast((Cl * np.ones(shape=(3*nside,4))).transpose(),
+                             nside, new=True)
+            # Calculate spectra
+            spec = cs.calc([tqu])
+            # Compare output spectra to the input power levels with appropriate
+            # tolerance (5 sigma).
+            tol = 5.0
+            self.assertTrue(np.abs(Cl[0] - spec[0,0,0]) < tol * np.sqrt(2) * Cl[0] / (2 * nside))
+            self.assertTrue(np.abs(Cl[1] - spec[1,0,0]) < tol * np.sqrt(2) * Cl[1] / (2 * nside))
+            self.assertTrue(np.abs(Cl[2] - spec[2,0,0]) < tol * np.sqrt(2) * Cl[2] / (2 * nside))
+            self.assertTrue(np.abs(Cl[3] - spec[3,0,0]) < tol * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside))
+            self.assertTrue(np.abs(spec[4,0,0]) < tol * np.sqrt(Cl[1] * Cl[2]) / (2 * nside))
+            self.assertTrue(np.abs(spec[5,0,0]) < tol * np.sqrt(Cl[0] * Cl[2]) / (2 * nside))
+            
 class BandpassTest(unittest.TestCase):
     """
     Unit tests for bandpass.py

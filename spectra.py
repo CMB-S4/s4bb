@@ -7,6 +7,9 @@ Power spectra
 
 import numpy as np
 import healpy as hp
+# Check whether NaMaster is installed
+try: import pymaster as nmt
+except ImportError: nmt = None
 
 def specind(nmap, m0, m1):
     """
@@ -607,5 +610,163 @@ class CalcSpec_healpy(CalcSpec):
             # Apply ell binning
             for j in range(self.nbin()):
                 spec[i,j,0] = Cl[self.bins[0,j]:self.bins[1,j]].mean()
+        # Return spectra as XSpec object.
+        return XSpec(self.maplist_out, self.bins, spec)
+
+class CalcSpec_namaster(CalcSpec):
+    """
+    Calculate power spectra using NaMaster
+        
+    """
+
+    def __init__(self, maplist_in, apod, nside, bins, use_Dl=True, pure_B=False):
+        """
+        Create a new CalcSpec_namaster object.
+        
+        """
+
+        # Raise an error if NaMaster is not installed.
+        if nmt is None:
+            raise ImportError('NaMaster is not installed.')
+
+        # Base class constructor handles some initial set up.
+        super().__init__(maplist_in, apod, nside, bins, use_Dl=use_Dl)
+
+        # If pure_B is a single boolean value, then repeat it for each map.
+        try:
+            len(pure_B) # will thrown an exception if pure_B is a boolean
+            self.pure_B = pure_B
+        except:
+            self.pure_B = [pure_B] * len(maplist_in)
+
+        # NaMaster binning operator
+        self.nmt_bin = nmt.NmtBin.from_edges(self.bins[0,:], self.bins[1,:],
+                                             is_Dell=self.use_Dl)
+            
+        # Set up NaMaster workspaces for power spectrum calculation.
+        # First, we need to generate spin-0 and spin-2 NmtField objects.
+        # Also gets the indexes to map from NmtField to maplist_out.
+        (fields, map_index) = self.make_fields()
+        # Then we need to make a list of NmtWorkspace for each auto or cross
+        # spectrum calculation, but also record how the output of each
+        # NmtWorkspace maps to our output spectrum ordering.
+        self.workspaces = []
+        self.spec_index = []
+        for (i,m0,m1) in specgen(len(fields)):
+            # Create workspace and compute coupling matrix.
+            ws = nmt.NmtWorkspace.from_fields(fields[m0], fields[m1], self.nmt_bin)
+            # Figure out the mapping from NaMaster ordering to our spectral
+            # ordering.
+            idx0 = map_index[m0]
+            idx1 = map_index[m1]
+            if (len(idx0) == 1) and (len(idx1) == 1):
+                # spin-0 x spin-0
+                ispec = [specind(self.nmap(), idx0[0], idx1[0])]
+            elif (len(idx0) == 1) and (len(idx1) == 2):
+                # spin-0 x spin-2
+                ispec = [specind(self.nmap(), idx0[0], j) for j in idx1]
+            elif (len(idx0) == 2) and (len(idx1) == 1):
+                # spin-2 x spin-0
+                ispec = [specind(self.nmap(), j, idx1[0]) for j in idx0]
+            elif (len(idx0) == 2) and (len(idx1) == 2):
+                # spin-2 x spin-2
+                ispec = [specind(self.nmap(), idx0[0], idx1[0]),
+                         specind(self.nmap(), idx0[0], idx1[1]),
+                         specind(self.nmap(), idx0[1], idx1[0]),
+                         specind(self.nmap(), idx0[1], idx1[1])]
+            else:
+                raise ValueError('NmtField with wrong number of entries!')
+            # Store results.
+            self.workspaces.append(ws)
+            self.spec_index.append(ispec)
+
+    def make_fields(self, maps=None):
+        """
+        Builds a list of NmtField objects corresponding to the input maps.
+
+        """
+        
+        # If maps are not provided, expand maps argument to match length
+        # of self.maplist_in
+        if maps is None: maps = [None] * len(self.maplist_in)
+
+        # Work through maplist_in and build a list of fields as well as the
+        # indexing needed to match NmtFields with maplist_out.
+        fields = []
+        map_index = []
+        counter = 0
+        for i in range(len(self.maplist_in)):
+            if self.maplist_in[i].field == 'T':
+                # Add a spin-0 field to list.
+                T = nmt.NmtField(self.apod[i], [maps[i]], spin=0,
+                                 beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                 lmax=self.nmt_bin.lmax)
+                fields.append(T)
+                map_index.append([counter])
+                counter += 1
+            elif self.maplist_in[i].field == 'QU':
+                # Add a spin-2 field to list.
+                QU = nmt.NmtField(self.apod[i], [maps[i][0], maps[i][1]], spin=2,
+                                  beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                  lmax=self.nmt_bin.lmax,
+                                  purify_b=self.pure_B[i])
+                fields.append(QU)
+                map_index.append([counter, counter+1])
+                counter += 2              
+            elif self.maplist_in[i].field == 'TQU':
+                # Need to add both spin-0 and spin-2 fields.
+                # Try/except blocks to handle case where maps[i] = None
+                try: 
+                    T = nmt.NmtField(self.apod[i], [maps[i][0]], spin=0,
+                                     beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                     lmax=self.nmt_bin.lmax)
+                except TypeError:
+                    T = nmt.NmtField(self.apod[i], None, spin=0,
+                                     beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                     lmax=self.nmt_bin.lmax)
+                fields.append(T)
+                map_index.append([counter])
+                try:
+                    QU = nmt.NmtField(self.apod[i], [maps[i][1], maps[i][2]], spin=2, 
+                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                      lmax=self.nmt_bin.lmax,
+                                      purify_b=self.pure_B[i])
+                except TypeError:
+                    QU = nmt.NmtField(self.apod[i], None, spin=2, 
+                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                      lmax=self.nmt_bin.lmax,
+                                      purify_b=self.pure_B[i])                    
+                fields.append(QU)
+                map_index.append([counter+1, counter+2])
+                counter += 3
+            else:
+                raise ValueError('input maps to CalcSpec must be T, QU, or TQU')
+        # Return both lists
+        return (fields, map_index)
+
+    def calc(self, maps):
+        """
+        Calculates auto and cross spectra for apodized maps.
+
+        Parameters
+        ----------
+        maps : list of Healpix maps
+
+        Returns
+        -------
+        spec : XSpec object
+
+        """
+
+        # Convert maps into NmtField objects.
+        (fields, map_index) = self.make_fields(maps)
+        # Calculate spectra using workspaces to decouple spectra.
+        spec = np.zeros(shape=(self.nspec(),self.nbin(),1))
+        for (i,m0,m1) in specgen(len(fields)):        
+            cl_coupled = nmt.compute_coupled_cell(fields[m0], fields[m1])
+            cl_decoupled = self.workspaces[i].decouple_cell(cl_coupled)
+            # Rearrange NaMaster spectra to follow our spectra ordering.
+            for j in range(len(self.spec_index[i])):
+                spec[self.spec_index[i][j],:,0] = cl_decoupled[j,:]
         # Return spectra as XSpec object.
         return XSpec(self.maplist_out, self.bins, spec)
