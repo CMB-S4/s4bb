@@ -202,7 +202,7 @@ class MapDef():
             return MapDef(self.name, self.field, bandpass=self.bandpass,
                           Bl=self.Bl, fwhm_arcmin=self.fwhm_arcmin)
     
-    def beam(self, ell_max, Blmin=0.0):
+    def beam(self, ell_max, Bl_min=0.0):
         """
         Returns the beam window function (Bl) for this map.
 
@@ -210,7 +210,7 @@ class MapDef():
         ----------
         ell_max : int
             Maximum ell value for the beam window function.
-        Blmin : float, optional
+        Bl_min : float, optional
             Minimum value for the beam window function. In the case of large
             beam sizes, Bl can reach extremely small values at high ell, which
             leads to problems when dividing by Bl to correct bandpowers. This
@@ -242,7 +242,7 @@ class MapDef():
         else:
             Bl = np.ones(ell_max + 1)
         # Apply floor to Bl
-        Bl[Bl < Blmin] = Blmin
+        Bl[Bl < Bl_min] = Bl_min
         # Done
         return Bl
 
@@ -437,7 +437,7 @@ class CalcSpec():
 
     """
 
-    def __init__(self, maplist_in, apod, nside, bins, use_Dl=True):
+    def __init__(self, maplist_in, apod, nside, bins, use_Dl=True, Bl_min=0.0):
         """
         Create a new CalcSpec object.
 
@@ -462,6 +462,9 @@ class CalcSpec():
         use_Dl : bool, optional
             By default, calculates Dl = l*(l+1)*Cl/(2*pi). Set argument to
             false to calculate Cl instead.
+        Bl_min : float, optional
+            If specified, sets the minimum value for Bl to avoid divide-by-zero
+            errors. Default value is 0.
 
         """
         
@@ -477,6 +480,7 @@ class CalcSpec():
         self.bins = bins
         self.nside = nside
         self.use_Dl = use_Dl
+        self.Bl_min = Bl_min
 
     def make_maplist_out(self):
         """
@@ -614,8 +618,8 @@ class CalcSpec_healpy(CalcSpec):
             # Cl -> Dl conversion but keep same variable name
             if self.use_Dl: Cl = Cl * Dlconv
             # Divide out beam window functions
-            Cl = Cl / self.maplist_out[m0].beam(len(Cl) - 1)
-            Cl = Cl / self.maplist_out[m1].beam(len(Cl) - 1)
+            Cl = Cl / self.maplist_out[m0].beam(len(Cl) - 1, Bl_min=self.Bl_min)
+            Cl = Cl / self.maplist_out[m1].beam(len(Cl) - 1, Bl_min=self.Bl_min)
             # Apply ell binning
             for j in range(self.nbin()):
                 spec[i,j,0] = Cl[self.bins[0,j]:self.bins[1,j]].mean()
@@ -628,7 +632,8 @@ class CalcSpec_namaster(CalcSpec):
         
     """
 
-    def __init__(self, maplist_in, apod, nside, bins, use_Dl=True, pure_B=False):
+    def __init__(self, maplist_in, apod, nside, bins, use_Dl=True,
+                 Bl_min=0.0, pure_B=False):
         """
         Create a new CalcSpec_namaster object.
         
@@ -639,7 +644,8 @@ class CalcSpec_namaster(CalcSpec):
             raise ImportError('NaMaster is not installed.')
 
         # Base class constructor handles some initial set up.
-        super().__init__(maplist_in, apod, nside, bins, use_Dl=use_Dl)
+        super().__init__(maplist_in, apod, nside, bins,
+                         use_Dl=use_Dl, Bl_min=Bl_min)
 
         # If pure_B is a single boolean value, then repeat it for each map.
         try:
@@ -725,11 +731,11 @@ class CalcSpec_namaster(CalcSpec):
                 # Add a spin-0 field to list.
                 if maps[i] is not None:
                     T = nmt.NmtField(self.apod[i], [maps[i]], spin=0,
-                                     beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                     beam=self.maplist_in[i].beam(self.nmt_bin.lmax, Bl_min=self.Bl_min),
                                      lmax=self.nmt_bin.lmax)
                 else:
                     T = nmt.NmtField(self.apod[i], None, spin=0,
-                                     beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                     beam=self.maplist_in[i].beam(self.nmt_bin.lmax, Bl_min=self.Bl_min),
                                      lmax=self.nmt_bin.lmax)
                 fields.append(T)
                 map_index.append([counter])
@@ -738,12 +744,12 @@ class CalcSpec_namaster(CalcSpec):
                 # Add a spin-2 field to list.
                 if maps[i] is not None:
                     QU = nmt.NmtField(self.apod[i], [maps[i][0], maps[i][1]], spin=2,
-                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax, Bl_min=self.Bl_min),
                                       lmax=self.nmt_bin.lmax,
                                       purify_b=self.pure_B[i])
                 else:
                     QU = nmt.NmtField(self.apod[i], None, spin=2,
-                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax, Bl_min=self.Bl_min),
                                       lmax=self.nmt_bin.lmax,
                                       purify_b=self.pure_B[i])
                 fields.append(QU)
@@ -753,18 +759,18 @@ class CalcSpec_namaster(CalcSpec):
                 # Need to add both spin-0 and spin-2 fields.
                 if maps[i] is not None:
                     T = nmt.NmtField(self.apod[i], [maps[i][0]], spin=0,
-                                     beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                     beam=self.maplist_in[i].beam(self.nmt_bin.lmax, Bl_min=self.Bl_min),
                                      lmax=self.nmt_bin.lmax)
                     QU = nmt.NmtField(self.apod[i], [maps[i][1], maps[i][2]], spin=2, 
-                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax, Bl_min=self.Bl_min),
                                       lmax=self.nmt_bin.lmax,
                                       purify_b=self.pure_B[i])
                 else:
                     T = nmt.NmtField(self.apod[i], None, spin=0,
-                                     beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                     beam=self.maplist_in[i].beam(self.nmt_bin.lmax, Bl_min=self.Bl_min),
                                      lmax=self.nmt_bin.lmax)
                     QU = nmt.NmtField(self.apod[i], None, spin=2, 
-                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax),
+                                      beam=self.maplist_in[i].beam(self.nmt_bin.lmax, Bl_min=self.Bl_min),
                                       lmax=self.nmt_bin.lmax,
                                       purify_b=self.pure_B[i])                    
                 fields.append(T)
