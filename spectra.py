@@ -202,14 +202,20 @@ class MapDef():
             return MapDef(self.name, self.field, bandpass=self.bandpass,
                           Bl=self.Bl, fwhm_arcmin=self.fwhm_arcmin)
     
-    def beam(self, ell_max):
+    def beam(self, ell_max, Blmin=0.0):
         """
-        Returns the beam window function for this map.
+        Returns the beam window function (Bl) for this map.
 
         Parameters
         ----------
         ell_max : int
             Maximum ell value for the beam window function.
+        Blmin : float, optional
+            Minimum value for the beam window function. In the case of large
+            beam sizes, Bl can reach extremely small values at high ell, which
+            leads to problems when dividing by Bl to correct bandpowers. This
+            argument allows you to specify a floor to the beam window function.
+            Default value is 0, i.e. no floor.
 
         Returns
         -------
@@ -235,6 +241,9 @@ class MapDef():
         # no beam defined
         else:
             Bl = np.ones(ell_max + 1)
+        # Apply floor to Bl
+        Bl[Bl < Blmin] = Blmin
+        # Done
         return Bl
 
 class XSpec():
