@@ -236,7 +236,7 @@ class MapDef():
         # otherwise, calculate Gaussian Bl from FWHM
         elif self.fwhm_arcmin is not None:
             ell = np.arange(ell_max + 1)
-            sigma_rad = np.radians(self.fwhm_arcmin / 60) * np.sqrt(8 * np.log(2))
+            sigma_rad = np.radians(self.fwhm_arcmin / 60) / np.sqrt(8 * np.log(2))
             Bl = np.exp(-0.5 * ell**2 * sigma_rad**2)
         # no beam defined
         else:
