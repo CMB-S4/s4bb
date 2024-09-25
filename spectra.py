@@ -7,8 +7,8 @@ Power spectra
 
 import numpy as np
 import healpy as hp
-from util import mapind, specind, specgen
-import bpwf
+from .util import mapind, specind, specgen
+from . import bpwf
 # Check whether NaMaster is installed
 try: import pymaster as nmt
 except ImportError: nmt = None
