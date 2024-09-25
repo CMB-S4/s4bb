@@ -12,4 +12,3 @@ import bandpass
 import bpcov
 import bpwf
 import spectra
-
