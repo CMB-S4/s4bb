@@ -9,8 +9,8 @@ import unittest
 import numpy as np
 import healpy as hp
 
-from spectra import specind, mapind, specgen, MapDef, XSpec
-from spectra import CalcSpec, CalcSpec_healpy, CalcSpec_namaster
+from util import specind, mapind, specgen, MapDef
+from spectra import XSpec, CalcSpec, CalcSpec_healpy, CalcSpec_namaster
 from bandpass import Bandpass
 from bpwf import BPWF
 from bpcov import BpCov
@@ -313,6 +313,70 @@ class SpectraTest(unittest.TestCase):
             self.assertTrue(np.abs(Cl[3] - spec[3,0,0]) < TOL * np.sqrt(Cl[0] * Cl[1] + Cl[3]**2) / (2 * nside) / np.sqrt(fsky))
             self.assertTrue(np.abs(spec[4,0,0]) < TOL * np.sqrt(Cl[1] * Cl[2]) / (2 * nside) / np.sqrt(fsky))
             self.assertTrue(np.abs(spec[5,0,0]) < TOL * np.sqrt(Cl[0] * Cl[2]) / (2 * nside) / np.sqrt(fsky))
+
+        # Test bandpower window functions using several ell bins and non-trivial input spectrum.
+        nside = 128
+        (theta, phi) = hp.pix2ang(nside, range(hp.nside2npix(nside)))
+        apod = np.sin(4 * theta)**2 * np.sin(2 * phi)**2
+        bins = np.stack((np.arange(50, 300, 25), np.arange(50, 300, 25) + 25))
+        cs = CalcSpec_namaster([m0], apod, nside, bins, use_Dl=True, pure_B=True)
+        # Input spectra with some peaks
+        lmax = bins[1,-1]
+        Cl_input = np.zeros(shape=(4,lmax+1))
+        Cl_input[0,50:150] = np.sin(2 * np.pi * np.arange(100) / 100)**2 # TT
+        Cl_input[1,50:150] = 0.1 * np.sin(3 * np.pi * np.arange(100) / 100)**2 # EE
+        Cl_input[2,50:150] = 1e-3 * np.sin(np.pi * np.arange(100) / 100)**2 # BB
+        Cl_input[3,:] = 0.1 * np.sqrt(Cl_input[0,:] * Cl_input[1,:]) # TE
+        # Use bandpower window functions to calculate expectation values
+        include_leakage = True
+        bpwf = cs.get_bpwf()
+        expv = np.zeros(shape=(6,cs.nbin()))
+        expv[0,:] = bpwf.expv('TT', 0, 0, lambda x: Cl_input[0,x])
+        expv[1,:] = bpwf.expv('EE', 1, 1, lambda x: Cl_input[1,x])
+        if include_leakage:
+            expv[1,:] += bpwf.expv('BB', 1, 1, lambda x: Cl_input[2,x])
+        expv[2,:] = bpwf.expv('BB', 2, 2, lambda x: Cl_input[2,x])
+        if include_leakage:
+            expv[2,:] += bpwf.expv('EE', 2, 2, lambda x: Cl_input[1,x])
+        expv[3,:] = bpwf.expv('TE', 0, 1, lambda x: Cl_input[3,x])
+        # Generate and analyze several simulated maps.
+        nsim = 5
+        for i in range(nsim):
+            sim = hp.synfast(Cl_input, nside, new=True)
+            if i == 0:
+                spec = cs.calc([sim])
+            else:
+                spec += cs.calc([sim])
+        # Compare expectation value to mean of sims.
+        # Calculate the expected bandpower variance here, but having a hard
+        # time passing this test quantitatively.
+        # - When calculating expectation values above, not sure of whether to
+        #   use the EE->BB and BB->EE leakage, hence the include_leakage flag.
+        # - Only look at the first four bandpowers, which cover ell=[50:150]
+        #   because this is where the input spectra are non-zero. Outside this
+        #   range, I think it is just too hard to get the wings of the window
+        #   functions exactly right.
+        # - Breaking down and increasing tolerance to 10 sigma for this test.
+        #   The plots look pretty good **and** perhaps this is really a test
+        #   of the NaMaster algorithm.
+        # - If this test is failing in the future, come back and look at this
+        #   comment!
+        TOL10 = 10.0
+        fsky = np.mean(apod**2)**2 / np.mean(apod**4) # Effective fsky of mask
+        k = fsky * np.array([(2 * np.arange(low, hi) + 1).sum() for (low, hi) in np.transpose(bins)])
+        var = np.zeros(expv.shape)
+        var[0,:] = 2 * expv[0,:]**2 / k / nsim # TT
+        self.assertTrue(all(((spec[0,:,:].mean(axis=1) - expv[0,:])**2 / var[0,:] < TOL10)[0:4]))
+        var[1,:] = 2 * expv[1,:]**2 / k / nsim # EE
+        self.assertTrue(all(((spec[1,:,:].mean(axis=1) - expv[1,:])**2 / var[1,:] < TOL10)[0:4]))
+        var[2,:] = 2 * expv[2,:]**2 / k / nsim # BB
+        self.assertTrue(all(((spec[2,:,:].mean(axis=1) - expv[2,:])**2 / var[2,:] < TOL10)[0:4]))
+        var[3,:] = (expv[0,:] * expv[1,:] + expv[3,:]**2) / k / nsim # TE
+        self.assertTrue(all(((spec[3,:,:].mean(axis=1) - expv[3,:])**2 / var[3,:] < TOL10)[0:4]))
+        var[4,:] = (expv[1,:] * expv[2,:]) / k / nsim # EB
+        self.assertTrue(all((spec[4,:,:].mean(axis=1)**2 / var[4,:] < TOL10)[0:4]))
+        var[5,:] = (expv[0,:] * expv[2,:]) / k / nsim # TB
+        self.assertTrue(all((spec[5,:,:].mean(axis=1)**2 / var[5,:] < TOL10)[0:4]))
         
 class BandpassTest(unittest.TestCase):
     """

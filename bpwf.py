@@ -30,7 +30,7 @@ Some conventions followed here:
 """
 
 import numpy as np
-from spectra import specind, specgen
+from util import specind, specgen
 
 class BPWF():
     """
