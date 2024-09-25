@@ -26,7 +26,7 @@ ordering, as discussed in spectra.py (which also contains helper functions).
 """
 
 import numpy as np
-from .util import specind, specgen
+from util import specind, specgen
 
 class BpCov():
     """

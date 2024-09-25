@@ -9,11 +9,11 @@ import unittest
 import numpy as np
 import healpy as hp
 
-from .util import specind, mapind, specgen, MapDef
-from .spectra import XSpec, CalcSpec, CalcSpec_healpy, CalcSpec_namaster
-from .bandpass import Bandpass
-from .bpwf import BPWF
-from .bpcov import BpCov
+from util import specind, mapind, specgen, MapDef
+from spectra import XSpec, CalcSpec, CalcSpec_healpy, CalcSpec_namaster
+from bandpass import Bandpass
+from bpwf import BPWF
+from bpcov import BpCov
 
 # Some of the tests involve generating maps, calculating power spectra, and
 # checking that we recover the input spectra. This involves sample variance,
