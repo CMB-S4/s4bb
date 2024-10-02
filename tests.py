@@ -14,6 +14,7 @@ from spectra import XSpec, CalcSpec, CalcSpec_healpy, CalcSpec_namaster
 from bandpass import Bandpass
 from bpwf import BPWF
 from bpcov import BpCov
+from models import Model
 
 # Some of the tests involve generating maps, calculating power spectra, and
 # checking that we recover the input spectra. This involves sample variance,
@@ -22,10 +23,7 @@ from bpcov import BpCov
 TOL = 5.0
 
 class SpectraTest(unittest.TestCase):
-    """
-    Unit tests for spectra.py
-
-    """
+    """Unit tests for spectra.py"""
     
     def setUp(self):
         # Five maps with a mix of T, E, B
@@ -379,10 +377,7 @@ class SpectraTest(unittest.TestCase):
         self.assertTrue(all((spec[5,:,:].mean(axis=1)**2 / var[5,:] < TOL10)[0:4]))
         
 class BandpassTest(unittest.TestCase):
-    """
-    Unit tests for bandpass.py
-
-    """
+    """Unit tests for bandpass.py"""
 
     def test_deltafn(self):
         """Test delta-fn bandpass"""
@@ -410,10 +405,7 @@ class BandpassTest(unittest.TestCase):
             self.assertEqual(1.0 / (nu1 - nu0), bp.fn(nu))
 
 class BpwfTest(unittest.TestCase):
-    """
-    Unit tests for bpwf.py
-
-    """
+    """Unit tests for bpwf.py"""
 
     def setUp(self):
         # BPWF object with three maps (T, E, B) and tophat window functions.
@@ -470,10 +462,7 @@ class BpwfTest(unittest.TestCase):
         self.assertTrue(all(self.wf.ell_eff('TT', 0)[keep] == wfnew.ell_eff('TT', 0)))
 
 class BpCovTest(unittest.TestCase):
-    """
-    Unit tests for bpcov.py
-
-    """
+    """Unit tests for bpcov.py"""
 
     def test_mask_ell(self):
         """Test BpCov.mask_ell method"""
@@ -614,6 +603,39 @@ class BpCovTest(unittest.TestCase):
                                                    [ 9,  9,  9, 1, 1, 1],
                                                    [ 9,  9,  9, 1, 1, 1],
                                                    [ 9,  9,  9, 1, 1, 1]])).all())
+
+class ModelsTest(unittest.TestCase):
+    """Unit tests for models.py"""
+
+    def test_base_model(self):
+        """Test Model base class"""
+
+        # Define some maps
+        m0 = MapDef('m0', 'T')
+        m1 = MapDef('m1', 'E')
+        m2 = MapDef('m2', 'B')
+        maplist = [m0, m1, m2]
+        # Define some bandpower window functions
+        lmax = 200
+        bin_edges = [20, 40, 60, 80, 100]
+        wf = BPWF.tophat(maplist, bin_edges, lmax=lmax)
+        # Construct model
+        mod = Model(maplist, wf)
+        # Check various dimensions
+        self.assertEqual(mod.nparam(), 0)
+        self.assertEqual(mod.nmap(), len(maplist))
+        self.assertEqual(mod.nspec(), len(maplist) * (len(maplist) + 1) // 2)
+        self.assertEqual(mod.nbin(), len(bin_edges) - 1)
+        # Test that theory_spec returns the right shape
+        self.assertTrue(np.all(mod.theory_spec([], 0, 0) == np.zeros((6,lmax+1))))
+        # Test that expv method returns the right shape
+        self.assertTrue(np.all(mod.expv([]) == np.zeros((mod.nspec(),mod.nbin()))))
+        # Use select method to drop one map and one ell bin.
+        # Then test to make sure that everything has the expected shape.
+        mod2 = mod.select([m0, m1], [0, 1, 2])
+        self.assertEqual(mod2.nmap(), 2)
+        self.assertEqual(mod2.nspec(), 3)
+        self.assertEqual(mod2.nbin(), 3)
         
 if __name__ == '__main__':
     unittest.main()
