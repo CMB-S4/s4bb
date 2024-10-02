@@ -608,22 +608,20 @@ class CalcSpec_namaster(CalcSpec):
             fn = self.workspaces[i].get_bandpower_windows() * conv
             if fn.shape[0] == 1:
                 # spin-0 x spin-0
-                (m0, m1) = mapind(self.nspec(), self.spec_index[i][0])
-                wf.add_windowfn('TT', m0, m1, fn[0,:,0,:])
+                wf.add_windowfn('TT', self.spec_index[i][0], fn[0,:,0,:])
             elif fn.shape[0] == 2:
                 # spin-0 x spin-2
                 for j in range(2):
-                    (m0, m1) = mapind(self.nspec(), self.spec_index[i][j])
-                    wf.add_windowfn('TE', m0, m1, fn[j,:,0,:])
-                    wf.add_windowfn('TB', m0, m1, fn[j,:,1,:])
+                    wf.add_windowfn('TE', self.spec_index[i][j], fn[j,:,0,:])
+                    wf.add_windowfn('TB', self.spec_index[i][j], fn[j,:,1,:])
             elif fn.shape[0] == 4:
                 # spin-2 x spin-2
                 for j in range(4):
-                    (m0, m1) = mapind(self.nspec(), self.spec_index[i][j])
-                    wf.add_windowfn('EE', m0, m1, fn[j,:,0,:])
-                    wf.add_windowfn('EB', m0, m1, fn[j,:,1,:])
-                    wf.add_windowfn('EB', m0, m1, fn[j,:,2,:])
-                    wf.add_windowfn('BB', m0, m1, fn[j,:,3,:])
+                    #(m0, m1) = mapind(self.nspec(), self.spec_index[i][j])
+                    wf.add_windowfn('EE', self.spec_index[i][j], fn[j,:,0,:])
+                    wf.add_windowfn('EB', self.spec_index[i][j], fn[j,:,1,:])
+                    wf.add_windowfn('EB', self.spec_index[i][j], fn[j,:,2,:])
+                    wf.add_windowfn('BB', self.spec_index[i][j], fn[j,:,3,:])
             else:
                 raise ValueError('NaMaster bpwf has bad shape: {}'.format(fn.shape))
         return wf

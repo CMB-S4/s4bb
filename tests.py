@@ -331,14 +331,14 @@ class SpectraTest(unittest.TestCase):
         include_leakage = True
         bpwf = cs.get_bpwf()
         expv = np.zeros(shape=(6,cs.nbin()))
-        expv[0,:] = bpwf.expv('TT', 0, 0, lambda x: Cl_input[0,x])
-        expv[1,:] = bpwf.expv('EE', 1, 1, lambda x: Cl_input[1,x])
+        expv[0,:] = bpwf.expv(Cl_input[0,:], 'TT', 0)
+        expv[1,:] = bpwf.expv(Cl_input[1,:], 'EE', 1)
         if include_leakage:
-            expv[1,:] += bpwf.expv('BB', 1, 1, lambda x: Cl_input[2,x])
-        expv[2,:] = bpwf.expv('BB', 2, 2, lambda x: Cl_input[2,x])
+            expv[1,:] += bpwf.expv(Cl_input[2,:], 'BB', 1)
+        expv[2,:] = bpwf.expv(Cl_input[2,:], 'BB', 2)
         if include_leakage:
-            expv[2,:] += bpwf.expv('EE', 2, 2, lambda x: Cl_input[1,x])
-        expv[3,:] = bpwf.expv('TE', 0, 1, lambda x: Cl_input[3,x])
+            expv[2,:] += bpwf.expv(Cl_input[1,:], 'EE', 2)
+        expv[3,:] = bpwf.expv(Cl_input[3,:], 'TE', 3)
         # Generate and analyze several simulated maps.
         nsim = 5
         for i in range(nsim):
@@ -420,53 +420,54 @@ class BpwfTest(unittest.TestCase):
         self.maplist = [MapDef('m0_T', 'T'),
                         MapDef('m1_E', 'E'),
                         MapDef('m2_B', 'B')]
-        self.wf = BPWF.tophat(self.maplist, [10, 20, 30, 40, 50, 60],
-                              lmin=0, lmax=100)
+        self.wf = BPWF.tophat(self.maplist, [10, 20, 30, 40, 50, 60], lmax=100)
         self.nbin = self.wf.nbin
 
     def test_expv(self):
         """Test BPWF.expv method"""
 
+        specin = np.ones(self.wf.lmax() + 1)
         # map0 x map0 should be TT only
-        self.assertTrue(all(self.wf.expv('TT', 0, 0, lambda x: 1) == np.ones(self.nbin)))
+        self.assertTrue(all(self.wf.expv(specin, 'TT', 0) == np.ones(self.nbin)))
         for spectype in ['EE','BB','TE','EB','TB']:
-            self.assertTrue(all(self.wf.expv(spectype, 0, 0, lambda x: 1) == np.zeros(self.nbin)))
+            self.assertTrue(all(self.wf.expv(specin, spectype, 0) == np.zeros(self.nbin)))
         # map1 x map1 should be EE only
-        self.assertTrue(all(self.wf.expv('EE', 1, 1, lambda x: 1) == np.ones(self.nbin)))
+        self.assertTrue(all(self.wf.expv(specin, 'EE', 1) == np.ones(self.nbin)))
         for spectype in ['TT','BB','TE','EB','TB']:
-            self.assertTrue(all(self.wf.expv(spectype, 1, 1, lambda x: 1) == np.zeros(self.nbin)))
+            self.assertTrue(all(self.wf.expv(specin, spectype, 1) == np.zeros(self.nbin)))
         # map2 x map2 should be BB only
-        self.assertTrue(all(self.wf.expv('BB', 2, 2, lambda x: 1) == np.ones(self.nbin)))
+        self.assertTrue(all(self.wf.expv(specin, 'BB', 2) == np.ones(self.nbin)))
         for spectype in ['TT','EE','TE','EB','TB']:
-            self.assertTrue(all(self.wf.expv(spectype, 2, 2, lambda x: 1) == np.zeros(self.nbin)))
+            self.assertTrue(all(self.wf.expv(specin, spectype, 2) == np.zeros(self.nbin)))
         # map0 x map2 should be TB only
-        self.assertTrue(all(self.wf.expv('TB', 0, 2, lambda x: 1) == np.ones(self.nbin)))
-        for spectype in ['TT','EE','BB','TE','EB']:
-            self.assertTrue(all(self.wf.expv(spectype, 0, 2, lambda x: 1) == np.zeros(self.nbin)))
+        self.assertTrue(all(self.wf.expv(specin, 'TE', 3) == np.ones(self.nbin)))
+        for spectype in ['TT','EE','BB','EB','TB']:
+            self.assertTrue(all(self.wf.expv(specin, spectype, 3) == np.zeros(self.nbin)))
 
     def test_select(self):
         """Test BPWF select method"""
 
+        specin = np.ones(self.wf.lmax() + 1)
         # First, try downselecting maps -- keep E and B only
         wfnew = self.wf.select([self.maplist[1], self.maplist[2]], None)
         # map0 x map0 should be EE only
-        self.assertTrue(all(wfnew.expv('EE', 0, 0, lambda x: 1) == np.ones(self.nbin)))
+        self.assertTrue(all(wfnew.expv(specin, 'EE', 0) == np.ones(self.nbin)))
         for spectype in ['TT','BB','TE','EB','TB']:
-            self.assertTrue(all(wfnew.expv(spectype, 0, 0, lambda x: 1) == np.zeros(self.nbin)))
+            self.assertTrue(all(wfnew.expv(specin, spectype, 0) == np.zeros(self.nbin)))
         # map1 x map1 should be BB only
-        self.assertTrue(all(wfnew.expv('BB', 1, 1, lambda x: 1) == np.ones(self.nbin)))
+        self.assertTrue(all(wfnew.expv(specin, 'BB', 1) == np.ones(self.nbin)))
         for spectype in ['TT','EE','TE','EB','TB']:
-            self.assertTrue(all(wfnew.expv(spectype, 1, 1, lambda x: 1) == np.zeros(self.nbin)))
+            self.assertTrue(all(wfnew.expv(specin, spectype, 1) == np.zeros(self.nbin)))
         # map0 x map1 should be EB only
-        self.assertTrue(all(wfnew.expv('EB', 0, 1, lambda x: 1) == np.ones(self.nbin)))
+        self.assertTrue(all(wfnew.expv(specin, 'EB', 2) == np.ones(self.nbin)))
         for spectype in ['TT','EE','BB','TE','TB']:
-            self.assertTrue(all(wfnew.expv(spectype, 0, 1, lambda x: 1) == np.zeros(self.nbin)))
+            self.assertTrue(all(wfnew.expv(specin, spectype, 2) == np.zeros(self.nbin)))
 
         # Next, try downselecting ell bins -- keep bins 2 and 3 only
         keep = [2, 3]
         wfnew = self.wf.select(None, keep)
         self.assertEqual(len(keep), wfnew.nbin)
-        self.assertTrue(all(self.wf.ell_eff('TT', 0, 0)[keep] == wfnew.ell_eff('TT', 0, 0)))
+        self.assertTrue(all(self.wf.ell_eff('TT', 0)[keep] == wfnew.ell_eff('TT', 0)))
 
 class BpCovTest(unittest.TestCase):
     """
