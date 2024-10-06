@@ -129,7 +129,8 @@ class MapDef():
 
     """
 
-    def __init__(self, name, field, bandpass=None, Bl=None, fwhm_arcmin=None):
+    def __init__(self, name, field, bandpass=None, Bl=None, fwhm_arcmin=None,
+                 lensing_template=False):
         """
         Create a new MapDef object.
 
@@ -151,6 +152,10 @@ class MapDef():
             Full-width at half maximum, in arc-minutes, to define a Gaussian
             beam for this map. If the `Bl` argument is specified, then it
             supersedes this value.
+        lensing_template : bool
+            If True, indicates that this map is a lensing template so signal
+            expectation values should contain lensing B modes only. Default is
+            False.
 
         """
         
@@ -160,6 +165,7 @@ class MapDef():
         self.bandpass = bandpass
         self.Bl = Bl
         self.fwhm_arcmin = fwhm_arcmin
+        self.lensing_template = lensing_template
 
     def __str__(self):
         return '{}_{}'.format(self.name, self.field)
