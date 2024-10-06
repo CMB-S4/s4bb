@@ -22,9 +22,9 @@ from models import Model
 # sigma.
 TOL = 5.0
 
-class SpectraTest(unittest.TestCase):
-    """Unit tests for spectra.py"""
-    
+class UtilTest(unittest.TestCase):
+    """Unit tests for util.py"""
+
     def setUp(self):
         # Five maps with a mix of T, E, B
         self.maps = [MapDef('m0_T', 'T'),
@@ -49,7 +49,7 @@ class SpectraTest(unittest.TestCase):
 
         for i in range(self.nspec):
             self.assertEqual(i, specind(self.nmap, self.spec[i][0],
-                                             self.spec[i][1]))
+                                        self.spec[i][1]))
 
     def test_mapind(self):
         """Test mapind function"""
@@ -71,6 +71,41 @@ class SpectraTest(unittest.TestCase):
         self.assertEqual(self.maps[0], MapDef('m0_T', 'T'))
         self.assertNotEqual(self.maps[0], MapDef('m0_T', 'E'))
         self.assertNotEqual(self.maps[0], MapDef('m1_T', 'T'))
+
+    def test_MapDef_dict(self):
+        """Test conversion between MapDef and dict"""
+
+        bp = Bandpass.tophat(90, 110)
+        m0 = MapDef('m0', 'B', bandpass=bp, fwhm_arcmin=10.0, lensing_template=False)
+        map_dict = m0.to_dict()
+        m1 = MapDef.from_dict(map_dict)
+        self.assertEqual(m0, m1)
+        np.testing.assert_allclose(m0.bandpass.nu, m1.bandpass.nu, atol=1e-15)
+        np.testing.assert_allclose(m0.bandpass.wgt, m1.bandpass.wgt, atol=1e-15)
+        self.assertEqual(m0.fwhm_arcmin, m1.fwhm_arcmin)        
+        self.assertEqual(m0.lensing_template, m1.lensing_template)
+    
+class SpectraTest(unittest.TestCase):
+    """Unit tests for spectra.py"""
+    
+    def setUp(self):
+        # Five maps with a mix of T, E, B
+        self.maps = [MapDef('m0_T', 'T'),
+                     MapDef('m1_E', 'E'),
+                     MapDef('m2_B', 'B'),
+                     MapDef('m3_E', 'E'),
+                     MapDef('m4_B', 'B')]
+        self.nmap = len(self.maps)
+        # Five maps yields 15 spectra... specify in vecp ordering
+        self.spec = [(0, 0), (1, 1), (2, 2), (3, 3), (4, 4),
+                     (0, 1), (1, 2), (2, 3), (3, 4),
+                     (0, 2), (1, 3), (2, 4),
+                     (0, 3), (1, 4),
+                     (0, 4)]
+        self.nspec = len(self.spec)
+        # Lower and upper edges for three ell bins
+        self.bins = np.array([[10, 20, 30], [20, 30, 40]])
+        self.nbin = self.bins.shape[1]
 
     def test_XSpec(self):
         """Test XSpec class"""
