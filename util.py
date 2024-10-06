@@ -6,6 +6,7 @@ Utility functions
 """
 
 import numpy as np
+import bandpass
 
 def specind(nmap, m0, m1):
     """
@@ -199,10 +200,78 @@ class MapDef():
 
         if update_field is not None:
             return MapDef(self.name, update_field, bandpass=self.bandpass,
-                          Bl=self.Bl, fwhm_arcmin=self.fwhm_arcmin)
+                          Bl=self.Bl, fwhm_arcmin=self.fwhm_arcmin,
+                          lensing_template=self.lensing_template)
         else:
             return MapDef(self.name, self.field, bandpass=self.bandpass,
-                          Bl=self.Bl, fwhm_arcmin=self.fwhm_arcmin)
+                          Bl=self.Bl, fwhm_arcmin=self.fwhm_arcmin,
+                          lensing_template=self.lensing_template)
+
+    def to_dict(self):
+        """
+        Returns a dict containing the information about this map.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        map_dict : dict
+            Dictionary object contain all of the information about the map.
+            This dict can be more easily serialized to a pickle file, etc.
+            Can convert back to a MapDef object using the from_dict class
+            method.
+
+        """
+
+        map_dict = {}
+        map_dict['name'] = self.name
+        map_dict['field'] = self.field
+        map_dict['bandpass'] = np.stack((self.bandpass.nu, self.bandpass.wgt))
+        map_dict['Bl'] = self.Bl
+        map_dict['fwhm_arcmin'] = self.fwhm_arcmin
+        map_dict['lensing_template'] = self.lensing_template
+        return map_dict
+
+    @classmethod
+    def from_dict(cls, map_dict):
+        """
+        Creates MapDef object from a dict.
+        
+        Parameters
+        ----------
+        map_dict : dict
+            Dictionary object containing information about the map. See
+            the MapDef.to_dict method for details about keys/values.
+
+        Returns
+        -------
+        new_map : MapDef
+            MapDef object containing map information.
+
+        """
+
+        # The name and field keys are required; other keys are optional.
+        try:
+            bp = bandpass.Bandpass(map_dict['bandpass'][0,:],
+                                   map_dict['bandpass'][1,:])
+        except KeyError:
+            bp = None
+        try:
+            Bl = map_dict['Bl']
+        except KeyError:
+            Bl = None
+        try:
+            fwhm_arcmin = map_dict['fwhm_arcmin']
+        except KeyError:
+            fwhm_arcmin = None
+        try:
+            lensing_template = map_dict['lensing_template']
+        except KeyError:
+            lensing_template = False
+        return cls(map_dict['name'], map_dict['field'], bandpass=bp, Bl=Bl,
+                   fwhm_arcmin=fwhm_arcmin, lensing_template=lensing_template)
     
     def beam(self, ell_max, Bl_min=0.0):
         """
