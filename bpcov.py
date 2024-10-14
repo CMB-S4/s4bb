@@ -33,8 +33,8 @@ class BpCov():
     A BpCov object contains the bandpower covariance matrix for the full set
     of auto and cross spectra derived from a set of maps.
 
-    This class can be used for a static, user-supplied bandpower covariance
-    matrix or as a base class for more complex bpcm constructions.
+    This class can be used for a static bandpower covariance matrix or as a
+    base class for more complex bpcm constructions.
 
     """
     
@@ -62,6 +62,36 @@ class BpCov():
         if matrix is not None:
             self.set(matrix)
 
+    @classmethod
+    def from_xspec(cls, spec):
+        """
+        Creates a BpCov object from the sample covariance of a set of spectra
+        provided as an XSpec object.
+
+        Parameters
+        ----------
+        spec : XSpec
+            Object containing realization of the spectra, from which we will
+            estimate the covariance matrix.
+
+        Returns
+        -------
+        bpcm : BpCov object
+            Bandpower covariance matrix estimated from the spectra.
+
+        """
+
+        # XSpec object stores spectra as array with shape (nspec, nbin, nrlz).
+        # We need to reshape this to (nspec*nbin, nrlz), with spectra
+        # incrementing quickly and ell bins incrementing slowly along axis 0.
+        nspec = spec.nspec()
+        nbin = spec.nbin()
+        nrlz = spec.nrlz()
+        specarr = np.reshape(spec.spec, (nspec * nbin, nrlz), 'F')
+        # Calculate covariance.
+        matrix = np.cov(specarr)
+        return BpCov(spec.maplist, nbin, matrix=matrix)
+    
     def nmap(self):
         """Returns the number of maps defined for this object."""
         
