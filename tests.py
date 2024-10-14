@@ -148,6 +148,15 @@ class SpectraTest(unittest.TestCase):
         self.assertTrue((xspec5[1,:,:] == xspec4[0,:,:]).all())
         self.assertTrue((xspec5[2,:,:] == xspec4[5,:,:]).all())
 
+        # Test select
+        # Downselect from 3 maps (6 spectra) to 1 map (1 spectrum)
+        # while also downselecting from 3 ell bins to 2 ell bins
+        xspec6 = xspec4.select([self.maps[1]], [0,1])
+        self.assertEqual(xspec6.nmap(), 1)
+        self.assertEqual(xspec6.nbin(), 2)
+        self.assertEqual(xspec6.nrlz(), xspec4.nrlz())
+        self.assertTrue((xspec6[0,:,:] == xspec4[1,0:2,:]).all())
+
     def test_CalcSpec(self):
         """Test CalcSpec base class"""
 

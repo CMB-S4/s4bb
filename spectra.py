@@ -164,7 +164,7 @@ class XSpec():
 
         # Return new XSpec object with selected maps, ell bins
         # Using .copy() for spectra data.
-        return XSpec(maplist, self.bins[:,ellind], self.spec[ispec,:,:].copy())
+        return XSpec(maplist, self.bins[:,ellind], self.spec[np.ix_(ispec, ellind)].copy())
 
 def fix_map(map_):
     """
