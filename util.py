@@ -131,7 +131,7 @@ class MapDef():
     """
 
     def __init__(self, name, field, bandpass=None, Bl=None, fwhm_arcmin=None,
-                 lensing_template=False):
+                 lensing_template=False, simtype=None):
         """
         Create a new MapDef object.
 
@@ -153,10 +153,14 @@ class MapDef():
             Full-width at half maximum, in arc-minutes, to define a Gaussian
             beam for this map. If the `Bl` argument is specified, then it
             supersedes this value.
-        lensing_template : bool
+        lensing_template : bool, optional
             If True, indicates that this map is a lensing template so signal
             expectation values should contain lensing B modes only. Default is
             False.
+        simtype : string, optional
+            Use this parameter to mark maps as 'signal' or 'noise' sims. This
+            property is used by the BpCov_signoi.from_xspec() class method.
+            Default is None, i.e. unspecified simtype.
 
         """
         
@@ -167,18 +171,35 @@ class MapDef():
         self.Bl = Bl
         self.fwhm_arcmin = fwhm_arcmin
         self.lensing_template = lensing_template
+        self.simtype = simtype
 
     def __str__(self):
-        return '{}_{}'.format(self.name, self.field)
+        # Map name and field
+        mapstr = '{}_{}'.format(self.name, self.field)
+        # Additional notes:
+        #  - Is this a lensing template?
+        #  - Is the sim type specified?
+        extras = []
+        if self.lensing_template:
+            extras.append('lensing_template')
+        if self.simtype is not None:
+            extras.append(self.simtype)
+        if len(extras) > 0:
+            mapstr += ' [{}]'.format(','.join(extras))
+        return mapstr
 
     def __eq__(self, value):
         """
         MapDef objects are considered equivalent if the name and field match.
-        We don't check whether the bandpasses match.
+        Also check that lensing template and simtype properties match.
+        Don't check whether the bandpasses or beams match.
         
         """
-        
-        return (self.name == value.name) and (self.field == value.field)
+
+        # For simtype, note that None == None evaluates as True.
+        return ((self.name == value.name) and (self.field == value.field) and
+                (self.lensing_template == value.lensing_template) and
+                (self.simtype == value.simtype))
 
     def copy(self, update_field=None):
         """
@@ -201,11 +222,13 @@ class MapDef():
         if update_field is not None:
             return MapDef(self.name, update_field, bandpass=self.bandpass,
                           Bl=self.Bl, fwhm_arcmin=self.fwhm_arcmin,
-                          lensing_template=self.lensing_template)
+                          lensing_template=self.lensing_template,
+                          simtype=self.simtype)
         else:
             return MapDef(self.name, self.field, bandpass=self.bandpass,
                           Bl=self.Bl, fwhm_arcmin=self.fwhm_arcmin,
-                          lensing_template=self.lensing_template)
+                          lensing_template=self.lensing_template,
+                          simtype=self.simtype)
 
     def to_dict(self):
         """
@@ -232,6 +255,7 @@ class MapDef():
         map_dict['Bl'] = self.Bl
         map_dict['fwhm_arcmin'] = self.fwhm_arcmin
         map_dict['lensing_template'] = self.lensing_template
+        map_dict['simtype'] = self.simtype
         return map_dict
 
     @classmethod
@@ -270,8 +294,13 @@ class MapDef():
             lensing_template = map_dict['lensing_template']
         except KeyError:
             lensing_template = False
+        try:
+            simtype = map_dict['simtype']
+        except KeyError:
+            simtype = None
         return cls(map_dict['name'], map_dict['field'], bandpass=bp, Bl=Bl,
-                   fwhm_arcmin=fwhm_arcmin, lensing_template=lensing_template)
+                   fwhm_arcmin=fwhm_arcmin, lensing_template=lensing_template,
+                   simtype=simtype)
     
     def beam(self, ell_max, Bl_min=0.0):
         """
