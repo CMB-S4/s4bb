@@ -57,6 +57,8 @@ class XSpec():
             self.spec = spec.reshape(nspec, nbin, 1)
         else:
             self.spec = spec
+        # Set shape attribute to match spec array.
+        self.shape = spec.shape
 
     def nmap(self):
         """Returns the number of maps"""
@@ -66,17 +68,17 @@ class XSpec():
     def nspec(self):
         """Returns the number of spectra"""
 
-        return self.spec.shape[0]
+        return self.shape[0]
 
     def nbin(self):
         """Returns the number of ell bins"""
 
-        return self.spec.shape[1]
+        return self.shape[1]
 
     def nrlz(self):
         """Returns the number of sim realizations"""
 
-        return self.spec.shape[2]
+        return self.shape[2]
 
     def __add__(self, xspec):
         """
