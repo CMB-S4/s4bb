@@ -13,7 +13,7 @@ from util import specind, mapind, specgen, MapDef
 from spectra import XSpec, CalcSpec, CalcSpec_healpy, CalcSpec_namaster
 from bandpass import Bandpass
 from bpwf import BPWF
-from bpcov import BpCov
+from bpcov import BpCov, BpCov_signoi
 from models import Model
 
 # Some of the tests involve generating maps, calculating power spectra, and
@@ -648,6 +648,127 @@ class BpCovTest(unittest.TestCase):
                                                    [ 9,  9,  9, 1, 1, 1],
                                                    [ 9,  9,  9, 1, 1, 1]])).all())
 
+    def bpcm_analytic(self, S, N, nmode):
+        """
+        Calculate analytic bandpower covariance matrix assuming a common
+        CMB-type signal and independent noise in all maps.
+
+        Parameters
+        ----------
+        S : float
+            Signal power for CMB-type signal (common to all maps)
+        N : array
+            Noise power for each map
+        nmode : float
+            Bandpower degrees-of-freedom
+
+        Returns
+        -------
+        bpcm : array
+            Analytic expectation for bandpower covariance matrix
+
+        """
+
+        # Allocate array
+        nmap = len(N)
+        nspec = nmap * (nmap + 1) // 2
+        bpcm = np.zeros(shape=(nspec,nspec))
+        # Double loop over covariance matrix
+        # Doesn't take advantage of symmetry, but should be fast enough
+        for (i,m0,m1) in specgen(nmap):
+            for (j,m2,m3) in specgen(nmap):
+                # Some bandpower expectation values
+                C02 = S + N[m0] if m0 == m2 else S
+                C13 = S + N[m1] if m1 == m3 else S
+                C03 = S + N[m0] if m0 == m3 else S
+                C12 = S + N[m1] if m1 == m2 else S
+                # Calculate 
+                bpcm[i,j] = (C02 * C13 + C03 * C12) / nmode
+
+    def test_bpcov_signoi(self):
+        """Test construction of BpCov_signoi from sims"""
+
+        # Simulate "maps" as collection of independent Gaussian modes.
+        nbin = 3
+        nmode = 50
+        nrlz = 1000
+        # CMB signal, common to all maps
+        S = 1.0 # signal power
+        cmb = np.sqrt(S) * np.random.randn(nbin, nmode, nrlz)
+        # Noise power for each map
+        nmap = 4
+        N = 10**(0.5 * np.random.randn(nmap))
+        noise = np.zeros(shape=(nmap,nbin,nmode,nrlz))
+        for i in range(nmap):
+            noise[i,:,:,:] = np.sqrt(N[i]) * np.random.randn(nbin, nmode, nrlz)
+        # Calculate all auto and cross spectra between signal and noise maps.
+        # Note that the 'cmb' map is the signal for all maps.
+        maplist_sn = []
+        for i in range(nmap):
+            maplist_sn.append(MapDef('m{}'.format(i), 'B', simtype='signal'))
+        for i in range(nmap):
+            maplist_sn.append(MapDef('m{}'.format(i), 'B', simtype='noise'))
+        bins = np.array([[20,30,40], [30,40,50]])
+        sn_nspec = 2 * nmap * (2 * nmap + 1) // 2
+        sn_sim = np.zeros(shape=(sn_nspec, nbin, nrlz))
+        for (i,m0,m1) in specgen(2 * nmap):
+            if m0 < nmap:
+                mapa = cmb
+            else:
+                mapa = noise[m0-nmap,:,:,:]
+            if m1 < nmap:
+                mapb = cmb
+            else:
+                mapb = noise[m1-nmap,:,:,:]
+            sn_sim[i,:,:] = (mapa * mapb).mean(axis=1)
+        spec = XSpec(maplist_sn, bins, sn_sim)
+        # Now construct BpCov_signoi object
+        maplist = [MapDef('m{}'.format(i), 'B') for i in range(nmap)]
+        bpcm = BpCov_signoi.from_xspec(maplist, spec)
+        Msim = bpcm.get()
+        # Get analytic expectation for bandpower covariance matrix
+        nspec = nmap * (nmap + 1) // 2
+        M = np.zeros(shape=(nspec*nbin,nspec*nbin))
+        Mblock = self.bpcm_analytic(S, N, nmode)
+        for i in range(nbin):
+            M[i*nspec:(i+1)*nspec,i*nspec:(i+1)*nspec] = Mblock
+        # Convert both covariance matrices to correlation matrices.
+        corr = M / np.sqrt(np.outer(np.diag(M), np.diag(M)))
+        corr_sim = Msim / np.sqrt(np.outer(np.diag(M), np.diag(M)))
+        # Test that all entries are within 5*sigma of analytic expectation.
+        np.testing.assert_allclose(corr, corr_sim, atol=5/nmode)
+
+        # Scale to a new signal model
+        S2 = 2.0
+        Msim = bpcm.get(sig_model=S2*np.ones(shape=(nspec,nbin)))
+        # Get analytic expectation
+        M = np.zeros(shape=(nspec*nbin,nspec*nbin))
+        Mblock = self.bpcm_analytic(S2, N, nmode)
+        for i in range(nbin):
+            M[i*nspec:(i+1)*nspec,i*nspec:(i+1)*nspec] = Mblock
+        # Convert to correlation matrices.
+        corr = M / np.sqrt(np.outer(np.diag(M), np.diag(M)))
+        corr_sim = Msim / np.sqrt(np.outer(np.diag(M), np.diag(M)))
+        # Test that all entries are within 5*sigma of expectation
+        np.testing.assert_allclose(corr, corr_sim, atol=5/nmode)
+
+        # Select just two maps out of four.
+        maplist2 = maplist[0:2]
+        N2 = N[0:2]
+        bpcm2 = bpcm.select(maplist=maplist2)
+        Msim = bpcm2.get()
+        # Get analytic expectation
+        nspec2 = 2 * 3 // 2
+        M = np.zeros(shape=(nspec2*nbin,nspec2*nbin))
+        Mblock = self.bpcm_analytic(S, N2, nmode)
+        for i in range(nbin):
+            M[i*nspec2:(i+1)*nspec2,i*nspec2:(i+1)*nspec2] = Mblock
+        # Convert to correlation matrices.
+        corr = M / np.sqrt(np.outer(np.diag(M), np.diag(M)))
+        corr_sim = Msim / np.sqrt(np.outer(np.diag(M), np.diag(M)))
+        # Test that all entries are within 5*sigma of expectation
+        np.testing.assert_allclose(corr, corr_sim, atol=5/nmode)
+        
 class ModelsTest(unittest.TestCase):
     """Unit tests for models.py"""
 
