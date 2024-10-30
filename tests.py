@@ -14,7 +14,7 @@ from spectra import XSpec, CalcSpec, CalcSpec_healpy, CalcSpec_namaster
 from bandpass import Bandpass
 from bpwf import BPWF
 from bpcov import BpCov, BpCov_signoi
-from models import Model
+from models import Model, Model_cmb
 
 # Some of the tests involve generating maps, calculating power spectra, and
 # checking that we recover the input spectra. This involves sample variance,
@@ -801,6 +801,72 @@ class ModelsTest(unittest.TestCase):
         self.assertEqual(mod2.nmap(), 2)
         self.assertEqual(mod2.nspec(), 3)
         self.assertEqual(mod2.nbin(), 3)
+
+    def test_model_cmb(self):
+        """Test Model_cmb class"""
+
+        # Define some maps
+        m0 = MapDef('m0', 'T')
+        m1 = MapDef('m1', 'E')
+        m2 = MapDef('m2', 'B')
+        m3 = MapDef('m3', 'E', lensing_template=True)
+        m4 = MapDef('m4', 'B', lensing_template=True)
+        maplist = [m0, m1, m2, m3, m4]
+        nmap = len(maplist)
+        nspec = nmap * (nmap + 1) // 2
+        # Define some bandpower window functions
+        lmax = 200
+        bin_edges = [20, 40, 60, 80, 100]
+        wf = BPWF.tophat(maplist, bin_edges, lmax=lmax)
+        nbin = wf.nbin
+        # Using some fake CMB spectra that are flat in ell, so that
+        # bandpower expectation values are trivial.
+        Cl_unlens = np.zeros(shape=(4,lmax+1))
+        Cl_unlens[0,:] = 10.0 # TT
+        Cl_unlens[1,:] = 1.0  # EE
+        Cl_unlens[2,:] = 0.0  # BB
+        Cl_unlens[3,:] = -2.5 # TE
+        Cl_lens = np.zeros(shape=(4,lmax+1))
+        Cl_lens[0,:] = 8.0
+        Cl_lens[1,:] = 0.75
+        Cl_lens[2,:] = 0.2
+        Cl_lens[3,:] = -2.0
+        Cl_tensor = np.zeros(shape=(4,lmax+1))
+        Cl_tensor[0,:] = 0.1
+        Cl_tensor[1,:] = 0.1
+        Cl_tensor[2,:] = 0.1
+        Cl_tensor[3,:] = 0.05
+        # Create the Model_cmb object
+        mod = Model_cmb(maplist, wf, Cl_unlens, Cl_lens, Cl_tensor)
+        # Check parameters
+        self.assertEqual(mod.nparam(), 2)
+        self.assertEqual(mod.param_dict_to_list({'r': 0, 'Alens': 1}), [0, 1])
+        # Check theory spectra for two non-lensing templates
+        np.testing.assert_allclose(mod.theory_spec([0,0], 0, 1).mean(axis=1),
+                                   np.array([10, 1, 0, -2.5, 0, 0]))
+        np.testing.assert_allclose(mod.theory_spec([0,1], 0, 1).mean(axis=1),
+                                   np.array([8, 0.75, 0.2, -2.0, 0, 0]))
+        np.testing.assert_allclose(mod.theory_spec([1,0], 0, 1).mean(axis=1),
+                                   np.array([10.1, 1.1, 0.1, -2.45, 0, 0]))
+        np.testing.assert_allclose(mod.theory_spec([1,1], 0, 1).mean(axis=1),
+                                   np.array([8.1, 0.85, 0.3, -1.95, 0, 0]))
+        np.testing.assert_allclose(mod.theory_spec([0,0.5], 0, 1).mean(axis=1),
+                                   np.array([9.0, 0.875, 0.1, -2.25, 0, 0]))
+        # Now try it for lensing template
+        np.testing.assert_allclose(mod.theory_spec([0,0], 0, 3).mean(axis=1),
+                                   np.array([0, 0, 0, 0, 0, 0]))
+        np.testing.assert_allclose(mod.theory_spec([0,1], 0, 3).mean(axis=1),
+                                   np.array([0, 0, 0.2, 0, 0, 0]))
+        np.testing.assert_allclose(mod.theory_spec([0,0.5], 0, 3).mean(axis=1),
+                                   np.array([0, 0, 0.1, 0, 0, 0]))
+        np.testing.assert_allclose(mod.theory_spec([1,0.5], 0, 3).mean(axis=1),
+                                   np.array([0, 0, 0.1, 0, 0, 0]))
+        # Test expectation values
+        expv = mod.expv([1, 1])
+        self.assertEqual(expv.shape, (nspec,nbin))
+        np.testing.assert_allclose(expv.mean(axis=1),
+                                   [8.1, 0.85, 0.3, 0.0, 0.2, -1.95, 0.0, 0.0,
+                                    0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0])
         
 if __name__ == '__main__':
     unittest.main()
