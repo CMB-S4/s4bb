@@ -7,6 +7,7 @@ Cross-spectrum theory models
 
 import numpy as np
 from util import specgen
+from bandpass import GHz, h, k
 
 class Model():
     """
@@ -379,3 +380,253 @@ class Model_cmb(Model):
         wf_new = self.wf.select(maplist, ellind)
         return Model_cmb(maplist, wf_new, self.Cl_unlens, self.Cl_lens,
                          self.Cl_tensor)
+
+class Model_fg(Model):
+    """
+    Polarized dust and synchrotron foreground model
+
+    Include dust-sync correlation, dust decorrelation, sync decorrelation
+
+    """
+
+    # 14 parameter model:
+    #   Dust parameters: A_d, alpha_d, beta_d, T_d, EEBB_d
+    #   Sync parameters: A_s, alpha_s, beta_s, EEBB_s
+    #   Dust-sync correlation parameter: epsilon
+    #   Dust decorrelation parameters: Delta_d, gamma_d
+    #   Sync decorrelation parameters: Delta_s, gamma_s
+    nparameters = 14
+
+    def __init__(self, maplist, wf, ell_pivot=80.0,
+                 dust_pivot=[353.0, 217.0], sync_pivot=[23.0, 33.0]):
+        """
+        Constructor
+
+        Parameters
+        ----------
+        maplist : list of MapDef objects
+        wf : BPWF object
+        ell_pivot : float
+        dust_pivot : list of 2 floats
+        sync_pivot : list of 2 floats
+
+        """
+
+        # Invoke base class constructor
+        super().__init__(maplist, wf)
+        self.ell_pivot = ell_pivot
+        self.dust_pivot = dust_pivot
+        self.sync_pivot = sync_pivot
+
+    def param_names(self):
+        """Get list of parameter names"""
+        
+        return ['A_d', 'alpha_d', 'beta_d', 'T_d', 'EEBB_d',
+                'A_s', 'alpha_s', 'beta_s', 'EEBB_s',
+                'epsilon', 'Delta_d', 'gamma_d', 'Delta_s', 'gamma_s']
+
+    def param_list_to_dict(self, param_list):
+        """
+        Convert list of parameters to a structured dictionary
+
+        Parameters
+        ----------
+        param_list : list
+            List of 14 parameters, in order returned by param_list method
+
+        Returns
+        -------
+        param_dict : dict
+            Dictionary of parameters
+
+        """
+
+        param_dict = {'A_d': param_list[0], 'alpha_d': param_list[1],
+                      'beta_d': param_list[2], 'T_d': param_list[3],
+                      'EEBB_d': param_list[4], 'A_s': param_list[5],
+                      'alpha_s': param_list[6], 'beta_s': param_list[7],
+                      'EEBB_s': param_list[8], 'epsilon': param_list[9],
+                      'Delta_d': param_list[10], 'gamma_d': param_list[11],
+                      'Delta_s': param_list[12], 'gamma_s': param_list[13]}
+        return param_dict
+
+    def param_dict_to_list(self, param_dict):
+        """
+        Convert parameters dictionary to an ordered list
+
+        Parameters
+        ----------
+        param_dict : dict
+            Dictionary of parameters
+
+        Returns
+        -------
+        param_list : list
+            List of 14 parameters, in order returned by param_list method
+
+        """
+
+        # Fill in default values for some parameters if they are not present
+        # in the dict.
+        param_list = []
+        # Dust parameters
+        param_list.append(param_dict['A_d'])
+        param_list.append(param_dict['alpha_d'])
+        param_list.append(param_dict['beta_d'])
+        try:
+            param_list.append(param_dict['T_d'])
+        except KeyError:
+            param_list.append(19.6)
+        try:
+            param_list.append(param_dict['EEBB_d'])
+        except KeyError:
+            param_list.append(2.0)
+        # Sync parameters
+        param_list.append(param_dict['A_s'])
+        param_list.append(param_dict['alpha_s'])
+        param_list.append(param_dict['beta_s'])
+        try:
+            param_list.append(param_dict['EEBB_s'])
+        except KeyError:
+            param_list.append(2.0)
+        # Dust-sync correlation
+        param_list.append(param_dict['epsilon'])
+        # Dust decorrelation
+        try:
+            param_list.append(param_dict['Delta_d'])
+        except KeyError:
+            param_list.append(1.0)
+        try:
+            param_list.append(param_dict['gamma_d'])
+        except KeyError:
+            param_list.append(0.0)
+        # Sync decorrelation
+        try:
+            param_list.append(param_dict['Delta_s'])
+        except KeyError:
+            param_list.append(1.0)
+        try:
+            param_list.append(param_dict['gamma_s'])
+        except KeyError:
+            param_list.append(0.0)
+        # Finally done
+        return param_list
+
+    def dust_scale(self, bandpass, beta_d, T_d):
+        """Calculates dust brightness relative to pivot frequency"""
+
+        fn = lambda nu: nu**(3 + beta_d) / (np.exp(h * nu * GHz / (k * T_d)) - 1.0)
+        return (bandpass.bandpass_integral(fn) / fn(self.dust_pivot[0]))
+
+    def sync_scale(self, bandpass, beta_s):
+        """Calculates sync brightness relative to pivot frequency"""
+
+        fn = lambda nu: nu**(2 + beta_s)
+        return (bandpass.bandpass_integral(fn) / fn(self.sync_pivot[0]))
+
+    def decorr(self, ell, bandpass0, bandpass1, pivot, Delta, gamma):
+        """Calculate correlation coefficient between two bands"""
+
+        # Scaling based on frequency ratio between the two bands.
+        # Uses bandpass average frequency, not a bandpass integral.
+        nu0 = bandpass0.nu_eff()
+        nu1 = bandpass1.nu_eff()
+        scale_nu = (np.log(nu0 / nu1) / np.log(pivot[0] / pivot[1]))**2
+        # Scaling in ell follows power law.
+        scale_ell = (ell / self.ell_pivot)**gamma
+        # Exponential function used to map correlation coefficients into the
+        # range [0,1], even for the of high ell and/or large frequency ratio.
+        # We use an analytic continuation for non-physical values of Delta that
+        # are greater than 1.
+        if Delta > 1:
+            return (2.0 - np.exp(np.log(2.0 - Delta) * scale_nu * scale_ell))
+        else:
+            return np.exp(np.log(Delta) * scale_nu * scale_ell)
+    
+    def theory_spec(self, param, m0, m1, lmax=None):
+        """
+        Return six theory spectra (TT,EE,BB,TE,EB,TB) for specified maps.
+
+        Note that the m0 and m1 indexes refer to MapDef objects that specify
+        both the map name and field. So if, for example, these both point to
+        B-mode maps, then you might expect this function to return a BB spectrum
+        only. Instead we return all six spectra because there might be leakage
+        from TT->BB, EE->BB, etc, that is calculated during application of the
+        bandpower window functions.
+
+        Parameters
+        ----------
+        param : list or dict
+            Model parameters in the form of an ordered list or a dict. See
+            param_dict_to_list docstring for details of the ordering.
+        m0 : int
+            Index of the first map in the cross spectrum.
+        m1 : int
+            Index of the second map in the cross spectrum.
+        lmax : int
+            Maximum ell to evaluate specta. Default is the max ell value of the
+            model bandpower window functions.
+
+        Returns
+        -------
+        spec : array, shape=(6,lmax+1)
+            Model theory spectra (TT,EE,BB,TE,EB,TB) for the specified
+            parameters.
+
+        """
+
+        # Check that m0,m1 are valid.
+        assert m0 < self.nmap()
+        assert m1 < self.nmap()
+        # If parameters are supplied as a dict, convert to list.
+        # Note that this function will fill in some parameters that might not
+        # have been defined in the dict.
+        if type(param) == dict:
+            param = self.param_dict_to_list(param)
+        assert len(param) == self.nparam()
+        # Get lmax
+        if lmax is None:
+            lmax = self.wf.lmax()
+        # Allocate array for spectra
+        ell = np.arange(lmax + 1)
+        spec = np.zeros(shape=(6,lmax+1))
+        # No foreground response for lensing template
+        if self.maplist[m0].lensing_template or self.maplist[m1].lensing_template:
+            pass
+        else:
+            with np.errstate(divide='ignore'):
+                dust_ell_scale = (ell / self.ell_pivot)**param[1]
+                dust_ell_scale[ell == 0.0] = 0.0
+            fdust0 = self.dust_scale(self.maplist[m0].bandpass, param[2], param[3])
+            fdust1 = self.dust_scale(self.maplist[m1].bandpass, param[2], param[3])
+            if param[10] == 1.0:
+                dust_decorr = np.ones(ell.shape)
+            else:
+                dust_decorr = self.decorr(ell, self.maplist[m0].bandpass,
+                                          self.maplist[m1].bandpass,
+                                          self.dust_pivot, param[10], param[11])
+            with np.errstate(divide='ignore'):
+                sync_ell_scale = (ell / self.ell_pivot)**param[6]
+                sync_ell_scale[ell == 0.0] = 0.0
+            fsync0 = self.sync_scale(self.maplist[m0].bandpass, param[7])
+            fsync1 = self.sync_scale(self.maplist[m1].bandpass, param[7])
+            if param[12] == 1.0:
+                sync_decorr = np.ones(ell.shape)
+            else:
+                sync_decorr = self.decorr(ell, self.maplist[m0].bandpass,
+                                          self.maplist[m1].bandpass,
+                                          self.sync_pivot, param[12], param[13])
+            # BB
+            BB_d = param[0] * fdust0 * fdust1 * dust_ell_scale * dust_decorr
+            BB_s = param[5] * fsync0 * fsync1 * sync_ell_scale * sync_decorr
+            BB_c = (param[9] * (fdust0 * fsync1 + fdust1 * fsync0) *
+                    np.sqrt(param[0] * param[5] * dust_ell_scale *
+                            sync_ell_scale * dust_decorr * sync_decorr))
+            spec[2,:] = BB_d + BB_s + BB_c
+            # EE -- include EE/BB ratio parameters for dust, sync
+            spec[1,:] = (param[4] * BB_d + param[8] * BB_s +
+                         np.sqrt(param[4] * param[8]) * BB_c)
+            # No foreground TT,TE,EB,TB in this model
+            # At some point, should do something about TT,TE at least
+        # Done
+        return spec
