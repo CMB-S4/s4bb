@@ -207,7 +207,7 @@ class Model_cmb(Model):
     # Two parameter model: r, Alens
     nparameters = 2
 
-    def __init__(self, maplist, wf, Cl_unlens, Cl_lens, Cl_tensor, lmin=0):
+    def __init__(self, maplist, wf, Cl_unlens, Cl_lens, Cl_tensor, rval, lmin=0):
         """
         Constructor
 
@@ -218,6 +218,7 @@ class Model_cmb(Model):
         Cl_unlens : array
         Cl_lens : array
         Cl_tensor : array
+        rval : float
 
         """
 
@@ -243,6 +244,7 @@ class Model_cmb(Model):
         else:
             raise ValueError('Cl_lens must contain 4 or 6 spectra')
         # Tensor CMB spectra
+        self.rval = rval
         self.Cl_tensor = np.zeros(shape=(6,lmin+Cl_tensor.shape[1]))
         if Cl_tensor.shape[0] == 4:
             self.Cl_tensor[0:4,lmin:] = Cl_tensor
@@ -351,7 +353,7 @@ class Model_cmb(Model):
             spec[:,0:N] = ((1 - param[1]) * self.Cl_unlens[:,0:N] +
                            param[1] * self.Cl_lens[:,0:N])
             # Add in tensor CMB spectra using r parameter
-            spec[:,0:N] += param[0] * self.Cl_tensor[:,0:N]
+            spec[:,0:N] += (param[0] / self.rval) * self.Cl_tensor[:,0:N]
         # Done
         return spec
 

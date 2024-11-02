@@ -837,7 +837,7 @@ class ModelsTest(unittest.TestCase):
         Cl_tensor[2,:] = 0.1
         Cl_tensor[3,:] = 0.05
         # Create the Model_cmb object
-        mod = Model_cmb(maplist, wf, Cl_unlens, Cl_lens, Cl_tensor)
+        mod = Model_cmb(maplist, wf, Cl_unlens, Cl_lens, Cl_tensor, 1.0)
         # Check parameters
         self.assertEqual(mod.nparam(), 2)
         self.assertEqual(mod.param_dict_to_list({'r': 0, 'Alens': 1}), [0, 1])
