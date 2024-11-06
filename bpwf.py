@@ -265,8 +265,11 @@ class BPWF():
         """
 
         if self.valid_windowfn(spectype, specout):
-            lmax = len(self.bpwf[specout][spectype])
-            return self.expv(np.arange(lmax), spectype, specout)
+            lmax = self.bpwf[specout][spectype].shape[1]
+            # We need to explicitly normalize the bpwf integral
+            norm = self.expv(np.ones(lmax), spectype, specout)
+            expval = self.expv(np.arange(lmax), spectype, specout)
+            return (expval / norm)
         else:
             raise ValueError('requested window function not defined')
 
