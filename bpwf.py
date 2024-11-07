@@ -152,6 +152,38 @@ class BPWF():
             self.bpwf[specout] = {}
         self.bpwf[specout][spectype] = fn
 
+    def adjust_windowfn(self, spectype, specout, scalefac):
+        """
+        Multiply bandpower window functions by a set of scale factors to
+        adjust their normalization.
+
+        Parameters
+        ----------
+        spectype : {'TT', 'EE', 'BB', 'TE', 'EB', 'TB'}
+            String specifying the input spectrum for the window functions
+        specout : int
+            Index of output spectrum by vecp ordering.
+        scalefac : float or array
+            Scale factor by which to multiply bandpower window functions.
+            If this is a float, then the same factor will be applied to all
+            ell bins. If this is an array, then it should have shape=(N,) where
+            N is the number of ell bins.
+
+        Returns
+        -------
+        None
+
+        """
+
+        # Check whether the specified window functions are defined.
+        if not self.valid_windowfn(spectype, specout):
+            raise KeyError('requested window function not defined')
+        # Apply scale factor(s).
+        # Slightly convoluted multiplication, but this works for either
+        # scalar or vector scalefac.
+        self.bpwf[specout][spectype] = (
+            self.bpwf[specout][spectype].transpose() * scalefac).transpose()
+
     def lmax(self):
         """
         Returns the max ell value used by any window function.
