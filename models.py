@@ -7,7 +7,7 @@ Cross-spectrum theory models
 
 import numpy as np
 from util import specgen
-from bandpass import GHz, h, k
+from bandpass import GHz, h, k, delta_Tcmb_to_delta_I
 
 class Model():
     """
@@ -518,13 +518,17 @@ class Model_fg(Model):
         """Calculates dust brightness relative to pivot frequency"""
 
         fn = lambda nu: nu**(3 + beta_d) / (np.exp(h * nu * GHz / (k * T_d)) - 1.0)
-        return (bandpass.bandpass_integral(fn) / fn(self.dust_pivot[0]))
+        scale = bandpass.bandpass_integral(fn) / fn(self.dust_pivot[0])
+        conv = bandpass.cmb_unit_conversion() / delta_Tcmb_to_delta_I(self.dust_pivot[0])
+        return (scale / conv)
 
     def sync_scale(self, bandpass, beta_s):
         """Calculates sync brightness relative to pivot frequency"""
 
         fn = lambda nu: nu**(2 + beta_s)
-        return (bandpass.bandpass_integral(fn) / fn(self.sync_pivot[0]))
+        scale = bandpass.bandpass_integral(fn) / fn(self.sync_pivot[0])
+        conv = bandpass.cmb_unit_conversion() / delta_Tcmb_to_delta_I(self.sync_pivot[0])
+        return (scale / conv)
 
     def decorr(self, ell, bandpass0, bandpass1, pivot, Delta, gamma):
         """Calculate correlation coefficient between two bands"""
