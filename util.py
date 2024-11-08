@@ -123,6 +123,35 @@ def specgen(nmap):
     for i in range(nspec):
         yield (i, m0[i], m1[i])
 
+def vecp_to_matrix(vecp):
+    """Converts bandpowers from vecp to matrix ordering"""
+
+    # Determine size of the array
+    nspec = vecp.shape[0]
+    nmap = int((-1 + np.sqrt(1 + 8 * nspec)) / 2)
+    assert (nmap * (nmap + 1) // 2) == nspec
+    nbin = vecp.shape[1]
+    matrix = np.zeros(shape=(nmap,nmap,nbin))
+    # Copy values from vecp to matrix (which is symmetric)
+    for (i,m0,m1) in specgen(nmap):
+        matrix[m0,m1,:] = vecp[i,:]
+        matrix[m1,m0,:] = vecp[i,:]
+    return matrix
+
+def matrix_to_vecp(matrix):
+    """Converts bandpowers from matrix to vecp ordering"""
+
+    # Determine the size of the array
+    nmap = matrix.shape[0]
+    assert matrix.shape[1] == nmap
+    nspec = nmap * (nmap + 1) // 2
+    nbin = matrix.shape[2]
+    vecp = np.zeros(shape=(nspec,nbin))
+    # Copy values from matrix to vecp
+    for (i,m0,m1) in specgen(nmap):
+        vecp[i,:] = matrix[m0,m1,:]
+    return vecp
+        
 class MapDef():
     """
     The MapDef object describes the properties of a map (or maps).
