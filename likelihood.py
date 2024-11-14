@@ -196,7 +196,11 @@ class Likelihood():
         nbin = self.nbin()
         X = np.zeros(C.shape)
         for i in range(nbin):
-            Cn12 = np.linalg.cholesky(np.linalg.inv(C[:,:,i]))
+            try:
+                Cn12 = np.linalg.cholesky(np.linalg.inv(C[:,:,i]))
+            except np.linalg.LinAlgError:
+                # If Cn12 is not positive definite, return a very large value
+                return 1e10
             (eigval, eigvec) = np.linalg.eigh(np.transpose(Cn12) @ Chat[:,:,i] @ Cn12)
             g = np.sign(eigval - 1.0) * np.sqrt(2 * (eigval - np.log(eigval) - 1.0))
             X[:,:,i] = (self.fiducial['Cf12'][:,:,i] @
