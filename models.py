@@ -379,9 +379,9 @@ class Model_cmb(Model):
 
         """
 
-        wf_new = self.wf.select(maplist, ellind)
-        return Model_cmb(maplist, wf_new, self.Cl_unlens, self.Cl_lens,
-                         self.Cl_tensor)
+        wf_new = self.wf.select(maplist=maplist, ellind=ellind)
+        return Model_cmb(wf_new.maplist, wf_new, self.Cl_unlens, self.Cl_lens,
+                         self.Cl_tensor, self.rval)
 
 class Model_fg(Model):
     """
@@ -636,3 +636,8 @@ class Model_fg(Model):
             # At some point, should do something about TT,TE at least
         # Done
         return spec
+
+    def select(self, maplist=None, ellind=None):
+        wf_new = self.wf.select(maplist, ellind)
+        return Model_fg(wf_new.maplist, wf_new, ell_pivot=self.ell_pivot,
+                        dust_pivot=self.dust_pivot, sync_pivot=self.sync_pivot)
