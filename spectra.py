@@ -12,8 +12,8 @@ try:
     import pymaster as nmt
 except ImportError:
     nmt = None
-from util import mapind, specind, specgen
 import bpwf
+from util import mapind, specind, specgen, MapDef
 
 class XSpec():
     """
@@ -167,6 +167,60 @@ class XSpec():
         # Return new XSpec object with selected maps, ell bins
         # Using .copy() for spectra data.
         return XSpec(maplist, self.bins[:,ellind], self.spec[np.ix_(ispec, ellind)].copy())
+
+    def to_hdf5(self, fh):
+        """
+        Record spectra to HDF5 file
+
+        Parameters
+        ----------
+        fh : h5py File object
+            h5py File object should be opened in write mode.
+
+        Returns
+        -------
+        None
+
+        """
+
+        # Store map list
+        fh.create_group('maplist')
+        fh['maplist'].attrs['nmap'] = self.nmap()
+        for i in range(len(self.maplist)):
+            self.maplist[i].to_hdf5(fh, f'maplist/{i:d}')
+        # Store ell bins
+        fh['bins'] = self.bins
+        # Store spectra array
+        fh['spectra'] = self.spec
+
+    @classmethod
+    def from_hdf5(cls, fh):
+        """
+        Read spectra from HDF5 file
+
+        Parameters
+        ----------
+        fh : h5py File object
+            h5py File object should be opened in read mode.
+
+        Returns
+        -------
+        spec : XSpec object
+            Power spectra and metadata recovered from HDF5 file.
+
+        """
+
+        # Get maplist
+        nmap = fh['maplist'].attrs['nmap']
+        maplist = []
+        for i in range(nmap):
+            maplist.append(MapDef.from_hdf5(fh, f'maplist/{i:d}'))
+        # Get ell bins
+        bins = np.array(fh['bins'])
+        # Get spectra
+        spectra = np.array(fh['spectra'])
+        # Return as XSpec object
+        return cls(maplist, bins, spectra)
 
 def fix_map(map_):
     """

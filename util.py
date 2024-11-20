@@ -374,3 +374,89 @@ class MapDef():
         Bl[Bl < Bl_min] = Bl_min
         # Done
         return Bl
+
+    def to_hdf5(self, fh, group):
+        """
+        Record map definition to HDF5 file
+
+        Parameters
+        ----------
+        fh : h5py File object
+            h5py File object should be opened in write mode.
+        group : string
+            HDF5 group specifier where map information will be recorded.
+
+        Returns
+        -------
+        None
+
+        """
+
+        # Store map name and field as string attributes.
+        fh.create_group(group)
+        fh[group].attrs['name'] = self.name
+        fh[group].attrs['field'] = self.field
+        # Store bandpass, if it is defined
+        if self.bandpass is not None:
+            self.bandpass.to_hdf5(fh, group + '/bandpass')
+        # Store Bl, if it is defined
+        if self.Bl is not None:
+            fh[group + 'Bl'] = self.Bl
+        # Set fwhm_arcmin as attribute, if it is defined
+        if self.fwhm_arcmin is not None:
+            fh[group].attrs['fwhm_arcmin'] = self.fwhm_arcmin
+        # Store lensing_template as boolean attribute.
+        fh[group].attrs['lensing_template'] = self.lensing_template
+        # Store simtype as string attribute, if it is defined
+        if self.simtype is not None:
+            fh[group].attrs['simtype'] = self.simtype
+
+    @classmethod
+    def from_hdf5(cls, fh, group):
+        """
+        Read map definition from HDF5 file
+
+        Parameters
+        ----------
+        fh : h5py File object
+            h5py File object should be opened in read mode.
+        group : string
+            HDF5 group specifier where map information is stored.
+
+        Returns
+        -------
+        mdef : MapDef object
+            Object containing map information read from HDF5 file.
+
+        """
+        
+        # Get map name and field
+        name = fh[group].attrs['name']
+        field = fh[group].attrs['field']
+        # Get bandpass, if it is defined.
+        if 'bandpass' in fh[group].keys():
+            bpass = bandpass.Bandpass.from_hdf5(fh, group + '/bandpass')
+        else:
+            bpass = None
+        # Get Bl, if it is defined
+        if 'Bl' in fh[group].keys():
+            Bl = np.array(fh[group + 'Bl'])
+        else:
+            Bl = None
+        # Get fwhm_arcmin, if it is defined
+        if 'fwhm_arcmin' in fh[group].attrs.keys():
+            fwhm_arcmin = fh[group].attrs['fwhm_arcmin']
+        else:
+            fwhm_arcmin = None
+        # Get lensing template flag
+        lensing_template = fh[group].attrs['lensing_template']
+        # Get simtype, if it is defined
+        if 'simtype' in fh[group].attrs.keys():
+            simtype = fh[group].attrs['simtype']
+        else:
+            simtype = None
+        # Return MapDef object
+        return cls(name, field, bandpass=bpass, Bl=Bl,
+                   fwhm_arcmin=fwhm_arcmin, lensing_template=lensing_template,
+                   simtype=simtype)
+

@@ -6,8 +6,10 @@ Unit Tests
 """
 
 import unittest
+import os
 import numpy as np
 import healpy as hp
+import h5py
 
 from util import specind, mapind, specgen, MapDef
 from spectra import XSpec, CalcSpec, CalcSpec_healpy, CalcSpec_namaster
@@ -157,6 +159,34 @@ class SpectraTest(unittest.TestCase):
         self.assertEqual(xspec6.nrlz(), xspec4.nrlz())
         self.assertTrue((xspec6[0,:,:] == xspec4[1,0:2,:]).all())
 
+    def test_XSpec_to_hdf5(self):
+        # MapDef objects with bells and whistles
+        m0 = MapDef('m0', 'E', bandpass=Bandpass.tophat(80, 100),
+                    fwhm_arcmin=25.0)
+        m1 = MapDef('m1', 'B', bandpass=Bandpass.tophat(140, 160),
+                    fwhm_arcmin=25.0)
+        m2 = MapDef('m2', 'B', lensing_template=True)
+        m3 = MapDef('m3', 'B', Bl=np.ones(300))
+        maplist = [m0, m1, m2, m3]
+        nmap = len(maplist)
+        nspec = nmap * (nmap + 1) // 2
+        # Create XSpec object
+        spec = XSpec(maplist, self.bins, np.zeros(shape=(nspec, self.nbin)))
+        # Write XSpec object to file
+        h5name = 'test.h5'
+        with h5py.File(h5name, 'w') as f:
+            spec.to_hdf5(f)
+        # Read back in from HDF5 file
+        with h5py.File(h5name, 'r') as f:
+            spec2 = XSpec.from_hdf5(f)
+        # Test that two objects are the same
+        for i in range(nmap):
+            self.assertEqual(spec.maplist[i], spec2.maplist[i])
+        np.testing.assert_allclose(spec.bins, spec2.bins, atol=1e-15)
+        np.testing.assert_allclose(spec.spec, spec2.spec, atol=1e-15)
+        # Remove temporary file
+        os.remove(h5name)
+        
     def test_CalcSpec(self):
         """Test CalcSpec base class"""
 

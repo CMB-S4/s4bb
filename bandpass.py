@@ -163,3 +163,48 @@ class Bandpass():
 
         return self.bandpass_integral(lambda x: x**(1+beta))
 
+    def to_hdf5(self, fh, group):
+        """
+        Record bandpass to HDF5 file
+
+        Parameters
+        ----------
+        fh : h5py File object
+            h5py File object should be opened in write mode.
+        group : string
+            HDF5 group specifier where bandpass arrays will be recorded.
+
+        Returns
+        -------
+        None
+
+        """
+
+        # Stack the frequency and weight arrays to produce array with
+        # shape=(2,N)
+        fh[group] = np.stack((self.nu, self.wgt))
+
+    @classmethod
+    def from_hdf5(cls, fh, group):
+        """
+        Read bandpass from HDF5 file
+
+        Parameters
+        ----------
+        fh : h5py File object
+            h5py File object should be opened in read mode.
+        group : string
+            HDF5 group specifier where bandpass data is located.
+
+        Returns
+        -------
+        bp : Bandpass object
+            Object containing bandpass read in from HDF5 file.
+
+        """
+
+        # Get frequency and weight arrays
+        nu = fh[group][0,:]
+        wgt = fh[group][1,:]
+        # Return bandpass object
+        return cls(nu, wgt)
