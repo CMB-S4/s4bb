@@ -180,11 +180,11 @@ class Model():
         Parameters
         ----------
         maplist : list of MapDef objects, optional
-            List of maps to use for the new XSpec object. Defaults to None,
+            List of maps to use for the new Model object. Defaults to None,
             which means that the new object will have the same map list as
             the existing object.
         ellind : list, optional
-            List of ell bins to keep for the new XSpec object. Ell bins are
+            List of ell bins to keep for the new Model object. Ell bins are
             specified by their integer index. Defaults to None, which means to
             *keep all ell bins*.
 
@@ -364,11 +364,11 @@ class Model_cmb(Model):
         Parameters
         ----------
         maplist : list of MapDef objects, optional
-            List of maps to use for the new XSpec object. Defaults to None,
+            List of maps to use for the new Model object. Defaults to None,
             which means that the new object will have the same map list as
             the existing object.
         ellind : list, optional
-            List of ell bins to keep for the new XSpec object. Ell bins are
+            List of ell bins to keep for the new Model object. Ell bins are
             specified by their integer index. Defaults to None, which means to
             *keep all ell bins*.
 
@@ -638,6 +638,27 @@ class Model_fg(Model):
         return spec
 
     def select(self, maplist=None, ellind=None):
+        """
+        Make a new Model_fg object with selected maps and/or ell bins.
+
+        Parameters
+        ----------
+        maplist : list of MapDef objects, optional
+            List of maps to use for the new Model object. Defaults to None,
+            which means that the new object will have the same map list as
+            the existing object.
+        ellind : list, optional
+            List of ell bins to keep for the new Model object. Ell bins are
+            specified by their integer index. Defaults to None, which means to
+            *keep all ell bins*.
+
+        Returns
+        -------
+        mod_new : Model_fg
+            New Model_fg object with updated maps and ell bins.
+
+        """
+
         wf_new = self.wf.select(maplist, ellind)
         return Model_fg(wf_new.maplist, wf_new, ell_pivot=self.ell_pivot,
                         dust_pivot=self.dust_pivot, sync_pivot=self.sync_pivot)

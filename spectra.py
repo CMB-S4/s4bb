@@ -356,7 +356,7 @@ class CalcSpec():
 
         Parameters
         ----------
-        maps : list
+        maps : list of Healpix maps
             This list should contain Healpix maps that match maplist_in. The
             Healpix maps are arrays with shape=(nmap,npix). Each maplist_in
             entry has field = 'T' (nmap=1), 'QU' (nmap=2), or 'TQU' (nmap=3).
@@ -388,10 +388,17 @@ class CalcSpec_healpy(CalcSpec):
         Parameters
         ----------
         maps : list of Healpix maps
+            This list should contain Healpix maps that match maplist_in. The
+            Healpix maps are arrays with shape=(nmap,npix). Each maplist_in
+            entry has field = 'T' (nmap=1), 'QU' (nmap=2), or 'TQU' (nmap=3).
+            The npix value should match the Healpix NSIDE defined in the
+            constructor.
 
         Returns
         -------
         spec : XSpec object
+            Object containing an array of power spectra with shape
+            (nspec, nbin, 1).
 
         """
 
@@ -461,7 +468,37 @@ class CalcSpec_namaster(CalcSpec):
                  Bl_min=0.0, pure_B=False):
         """
         Create a new CalcSpec_namaster object.
-        
+
+        Parameters
+        ----------
+        maplist_in : list of MapDef
+            This is a list that defines the maps that we will calculate auto
+            and cross spectra form. These input maps should have field set to
+            'T', 'QU', or 'TQU'.
+        apod : Healpix map or list of Healpix maps
+            Apodization that will be used to weight maps before transform.
+            If a single Healpix map is supplied, then the same apodization
+            will be used for all maps. The alternative is to supply a list of
+            apodization maps, one for each entry in maplist_in.
+        nside : int, power of 2
+            Healpix NSIDE used for *all* maps.
+        bins : array, shape=(2,nbin)
+            Array containing the lower edges, in bins[0,:], and upper edges, in
+            bins[1,:], of each ell bin. Following the usual python convention,
+            ell bins are defined to be *inclusive* of the lower edge but
+            *exclusive* of the upper edge.
+        use_Dl : bool, optional
+            By default, calculates Dl = l*(l+1)*Cl/(2*pi). Set argument to
+            false to calculate Cl instead.
+        Bl_min : float, optional
+            If specified, sets the minimum value for Bl to avoid divide-by-zero
+            errors. Default value is 0.
+        pure_B : bool or list of bools, optional
+            Set to True to use the NaMaster pure-B estimator. If a single
+            boolean value is provided, then it is used for all maps.
+            Alternatively, a list of boolean values can be provided to select
+            whether pure-B is used for each map. Default value is False.
+                
         """
 
         # Raise an error if NaMaster is not installed.
@@ -523,6 +560,17 @@ class CalcSpec_namaster(CalcSpec):
     def make_fields(self, maps=None):
         """
         Builds a list of NmtField objects corresponding to the input maps.
+        This function is usually called internally by the constructor.
+
+        Parameters
+        ----------
+        maps : list, optional
+            List of maps to use for NmtField objects. I don't think these are
+            used for anything. Default is None.
+
+        Returns
+        -------
+        None
 
         """
         
@@ -608,10 +656,17 @@ class CalcSpec_namaster(CalcSpec):
         Parameters
         ----------
         maps : list of Healpix maps
+            This list should contain Healpix maps that match maplist_in. The
+            Healpix maps are arrays with shape=(nmap,npix). Each maplist_in
+            entry has field = 'T' (nmap=1), 'QU' (nmap=2), or 'TQU' (nmap=3).
+            The npix value should match the Healpix NSIDE defined in the
+            constructor.
 
         Returns
         -------
         spec : XSpec object
+            Object containing an array of power spectra with shape
+            (nspec, nbin, 1).
 
         """
 
