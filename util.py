@@ -203,6 +203,8 @@ class MapDef():
         self.simtype = simtype
 
     def __str__(self):
+        """Short description of the map"""
+        
         # Map name and field
         mapstr = '{}_{}'.format(self.name, self.field)
         # Additional notes:

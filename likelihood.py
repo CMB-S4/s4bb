@@ -10,6 +10,13 @@ import numpy as np
 from s4bb.util import vecp_to_matrix, matrix_to_vecp
 
 class Likelihood():
+    """
+    The Likelihood object contains theory model(s), bandpower covariance matrix,
+    and other information necessary to calculate the likelihood for provided
+    bandpowers.
+
+    """
+    
     def __init__(self, maplist, bias=None, bpcm=None, models=[]):
         """
         Construct a new Likelihood object
@@ -35,6 +42,23 @@ class Likelihood():
         self.fiducial = None
 
     def set_bias(self, bias):
+        """
+        Assigns the noise bias that must be added to theory expectation
+        values before comparing to data.
+
+        Parameters
+        ----------
+        bias : XSpec
+            XSpec object containing noise bias bandpowers for all auto and
+            cross spectra. Note that noise biases must be specified for cross
+            spectra, even if they are zero.
+
+        Returns
+        -------
+        None
+
+        """
+        
         assert bias.maplist == self.maplist
         if self.bpcm is not None:
             assert bias.nbin() == self.bpcm.nbin
@@ -43,6 +67,22 @@ class Likelihood():
         self.bias = bias
 
     def set_bpcm(self, bpcm):
+        """
+        Assigns the bandpower covariance matrix object used to calculate
+        covariance of auto and cross spectra.
+
+        Parameters
+        ----------
+        bpcm : BpCov
+            BpCov object (or derived class) that can calculate the bandpower
+            covariance matrix for all auto and cross spectra.
+
+        Returns
+        -------
+        None
+
+        """
+        
         assert bpcm.maplist == self.maplist
         if self.bias is not None:
             assert bpcm.nbin == self.bias.nbin()
@@ -51,6 +91,21 @@ class Likelihood():
         self.bpcm = bpcm
 
     def set_models(self, models):
+        """
+        Assigns the theory model(s) used to calculate bandpower expectation
+        values.
+
+        Parameters
+        ----------
+        models : list of Model objects
+            A list containing one or more objects of Model or derived class.
+
+        Returns
+        -------
+        None
+
+        """
+        
         for model in models:
             assert model.maplist == self.maplist
             if self.bias is not None:
@@ -60,13 +115,19 @@ class Likelihood():
         self.models = models
 
     def nmap(self):
+        """Get number of maps used for this likelihood"""
+        
         return len(self.maplist)
 
     def nspec(self):
+        """Get number of spectra used for this likelihood"""
+        
         n = self.nmap()
         return (n * (n + 1) // 2)
 
     def nbin(self):
+        """Get number of ell bins used for this likelihood"""
+        
         # There are a variety of ways to get nbin, some of which might not be
         # defined. They should all be consistent.
         try:
@@ -82,12 +143,16 @@ class Likelihood():
         return None
         
     def nparam(self):
+        """Get number of model parameters used for this likelihood"""
+        
         n = 0
         for model in models:
             n += model.nparam()
         return n
 
     def param_names(self):
+        """Get list of model parameter names"""
+        
         names = []
         for model in self.models:
             for param in model.param_names():
@@ -95,6 +160,8 @@ class Likelihood():
         return names
 
     def param_list_to_dict(self, param_list):
+        """Convert list of model parameter values to dictionary form"""
+        
         param_dict = {}
         i = 0
         for model in self.models:
@@ -106,6 +173,8 @@ class Likelihood():
         return param_dict
 
     def param_dict_to_list(self, param_dict):
+        """Convert model parameter dictionary to list of parameter values"""
+        
         param_list = []
         for model in self.models:
             temp_list = model.param_dict_to_list(param_dict)
@@ -114,6 +183,25 @@ class Likelihood():
         return param_list
 
     def expv(self, param, include_bias=True):
+        """
+        Calculate model expectation values for specified parameters.
+
+        Parameters
+        ----------
+        param : list or dict
+            Model parameters, either in list or dict form. See
+            param_list_to_dict and param_dict_to_list to convert between forms.
+        include_bias : bool, optional
+            By default, expectation values will include noise bias. Set to
+            False if you want the theory expectation values only, with no bias.
+
+        Returns
+        -------
+        expval : array, shape=(nspec,nbin)
+            Array of bandpower expectation values
+
+        """
+        
         expval = np.zeros(shape=(self.nspec(), self.nbin()))
         if type(param) == dict:
             for model in self.models:
@@ -140,13 +228,26 @@ class Likelihood():
         expv : array
             Array of bandpower expectation values with shape (N,M), where N is
             the number of spectra and M is the number of ell bins.
+        noffdiag : int, optional
+            Number of off-diagonal blocks to keep for the bandpower covariance
+            matrix. These blocks contain covariance between different ell bins.
+            If this parameter is set to 0, then we only keep covariance for
+            bandpowers of the same ell bin. If parameter is set to 1, then we
+            keep covariance between bandpowers of adjacent ell bins, etc.
+            Default value is None, which means that we keep covariance between
+            all bandpowers.
+        mask_noise : bool, optional
+            If True (default), then set some bandpower covariance matrix terms
+            to zero under assumption that noise is independent between different
+            maps. If False, do not make this assumption.
 
         Returns
         -------
         None
 
         """
-    
+
+        # Overwrites any previous compute_fiducial_bpcm calculation.
         self.fiducial = {}
         # Record fiducial model bandpowers in matrix form (include noise bias)
         self.fiducial['Cf'] = vecp_to_matrix(expv + self.bias[:,:,0])
