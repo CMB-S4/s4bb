@@ -267,6 +267,33 @@ class Likelihood():
         # Calculate inverse bandpower covariance matrix.
         self.fiducial['Minv'] = np.linalg.inv(self.fiducial['M'])
 
+    def chi2(self, expv, data):
+        """
+        Calculates chi^2 for specified model expectation values and data.
+
+        Parameters
+        ----------
+        expv : array
+            Array of bandpower expectation values with shape (N,M), where N is
+            the number of spectra and M is the number of ell bins.
+        data : array
+            Array of data bandpowers with same shape as expv.
+
+        Returns
+        -------
+        logL : float
+            chi^2, which is -2 * log(likelihood) for Gaussian likelihood.
+
+        """
+
+        # Take difference of data and expectation value.
+        x = data - expv
+        # Concatenate ell bins to get a long vector that matches bpcm ordering.
+        x = np.reshape(x, (np.prod(dev.shape),), order='F')
+        # Calculate chi^2
+        logL = x @ self.fiducial['Minv'] @ x
+        return logL
+
     def hl_likelihood(self, expv, data):
         """
         Calculates Hamimeche-Lewis likelihood for specified model expectation
