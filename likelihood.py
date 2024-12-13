@@ -7,7 +7,8 @@ Likelihoods
 
 import warnings
 import numpy as np
-from s4bb.util import vecp_to_matrix, matrix_to_vecp
+from scipy.optimize import minimize
+from util import vecp_to_matrix, matrix_to_vecp
 
 class Likelihood():
     """
@@ -340,3 +341,80 @@ class Likelihood():
         # Calculate -2*log(L) as chi^2
         logL = Xv @ self.fiducial['Minv'] @ Xv
         return logL
+
+    def mlsearch(self, data, start, free=None, limits={}):
+        """
+        Maximum likelihood search to find model parameters that best match data.
+
+        Using L-BFGS-B minimizer from scipy.optimize. In the future, could
+        add ability to use other minimizers, specify convergence options, etc.
+
+        Parameters
+        ----------
+        data : array
+            Array of data bandpowers with shape (N,M), where N is the number of
+            spectra and M is the number of ell bins.
+        start : list or dict
+            Model parameters to use as the starting point for the search. These
+            can either be in list or dict form. See param_list_to_dict and
+            param_dict_to_list to convert between forms.
+        free : list, optional
+            List containing the names of parameters that are allowed to vary in
+            the maximum likelihood search. Default is None, which means that
+            all model parameters are allowed to vary.
+        limits : dict, optional
+            Dictionary specifying allowed ranges of parameters. The dict should
+            be keyed on parameter names with values set to two-element lists
+            containing the lower and upper limits. One or both of these limits
+            can be set to None to indicate no bound. Parameters that are not
+            found in the dict are assumed to be unbounded.
+
+        Returns
+        -------
+        result : dict
+            Dictionary containing best-fit parameters (for parameters that are
+            free to vary) and starting parameters (for parameters that are
+            fixed).
+        fval : float
+            Minimum value of -2*log(L) found in the search.
+        status : int
+            Termination status of the optimizer. 0 indicates success. Other
+            values indicate different reasons for failure to converge.
+        
+        """
+
+        # If start point is provided as a list, convert to dict.
+        if type(start) is not dict:
+            start_dict = self.param_list_to_dict(start)
+        else:
+            start_dict = start
+        # If free=None, then vary all parameters
+        if free is None:
+            free = self.param_names()
+
+        # Define function to be minimized
+        def minfun(p, lik, data, start_dict, free):
+            # Merge free and fixed parameters
+            for (key,val) in zip(free,p):
+                start_dict[key] = val
+            # Get model expectation values.
+            expval = lik.expv(start_dict, include_bias=True)
+            # Calculate likelihood.
+            return lik.hl_likelihood(expval, data)
+
+        # Parameter limits provided to minimize function
+        bounds = []
+        for param in free:
+            try:
+                bounds[param] = limits[param]
+            except KeyError:
+                bounds[param] = (None, None)
+
+        # Run minimizer
+        guess = [start_dict[key] for key in free]
+        fit = minimize(minfun, guess,bounds=bounds, method='L-BFGS-B',
+                       args=(self, data, start_dict.copy(), free))
+        result = start_dict.copy()
+        for (key,val) in zip(free,fit.x):
+            result[key] = val
+        return (result, fit.fun, fit.status)
