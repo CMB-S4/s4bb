@@ -327,10 +327,12 @@ class Likelihood():
         for i in range(nbin):
             try:
                 Cn12 = np.linalg.cholesky(np.linalg.inv(C[:,:,i]))
+                (eigval, eigvec) = np.linalg.eigh(np.transpose(Cn12) @ Chat[:,:,i] @ Cn12)
             except np.linalg.LinAlgError:
-                # If Cn12 is not positive definite, return a very large value
+                # If Cn12 is not positive definite or we can't diagonalize the
+                # bandpower ratio matrix, return a very large value of -2*log(L)
+                # to indicate that this a bad part of parameter space.
                 return 1e10
-            (eigval, eigvec) = np.linalg.eigh(np.transpose(Cn12) @ Chat[:,:,i] @ Cn12)
             g = np.sign(eigval - 1.0) * np.sqrt(2 * (eigval - np.log(eigval) - 1.0))
             X[:,:,i] = (self.fiducial['Cf12'][:,:,i] @
                         (eigvec @ np.diag(g) @ np.transpose(eigvec)) @
@@ -406,9 +408,9 @@ class Likelihood():
         bounds = []
         for param in free:
             try:
-                bounds[param] = limits[param]
+                bounds.append(limits[param])
             except KeyError:
-                bounds[param] = (None, None)
+                bounds.append((None, None))
 
         # Run minimizer
         guess = [start_dict[key] for key in free]
