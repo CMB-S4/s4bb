@@ -222,15 +222,14 @@ class MapDef():
     def __eq__(self, value):
         """
         MapDef objects are considered equivalent if the name and field match.
-        Also check that lensing template and simtype properties match.
-        Don't check whether the bandpasses or beams match.
+        Also check that lensing template properties match. Don't check whether 
+        the bandpasses, beams, or simtypes match.
         
         """
 
         # For simtype, note that None == None evaluates as True.
         return ((self.name == value.name) and (self.field == value.field) and
-                (self.lensing_template == value.lensing_template) and
-                (self.simtype == value.simtype))
+                (self.lensing_template == value.lensing_template))
 
     def copy(self, update_field=None):
         """
