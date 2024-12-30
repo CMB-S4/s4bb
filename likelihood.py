@@ -115,6 +115,41 @@ class Likelihood():
                 assert model.nbin() == self.bpcm.nbin
         self.models = models
 
+    def select(self, maplist=None, ellind=None):
+        """
+        Make a new Likelihood object with selected maps and/or ell bins.
+
+        Note that this method wipes out any existing fiducial model calculation.
+
+        Parameters
+        ----------
+        maplist : list of MapDef objects, optional
+            List of maps to use for the new Likelihood object. Defaults to None,
+            which means that the new Likelihood object will have the same map list
+            as the existing object.
+        ellind : list, optional
+            List of ell bins to keep for the new Likelihood object. Ell bins are
+            specified by their integer index. Defaults to None, which means to
+            *keep all ell bins*.
+
+        Returns
+        -------
+        lik_new : Likelihood
+            New Likelihood object with updated maps and ell bins.        
+
+        """
+
+        # Call select methods of the objects that make up the Likelihood.
+        new_bias = self.bias.select(maplist=maplist, ellind=ellind)
+        new_bpcm = self.bpcm.select(maplist=maplist, ellind=ellind)
+        new_models = []
+        for mod in self.models:
+            new_models.append(mod.select(maplist=maplist, ellind=ellind))
+        # Then construct new Likelihood object.
+        lik_new = Likelihood(new_bias.maplist, bias=new_bias,
+                             bpcm=new_bpcm, models=new_models)
+        return lik_new
+        
     def nmap(self):
         """Get number of maps used for this likelihood"""
         
@@ -344,7 +379,8 @@ class Likelihood():
         logL = Xv @ self.fiducial['Minv'] @ Xv
         return logL
 
-    def mlsearch(self, data, start, free=None, limits={}):
+    def mlsearch(self, data, start, free=None, limits={},
+                 method='L-BFGS-B', options={}):
         """
         Maximum likelihood search to find model parameters that best match data.
 
@@ -370,6 +406,10 @@ class Likelihood():
             containing the lower and upper limits. One or both of these limits
             can be set to None to indicate no bound. Parameters that are not
             found in the dict are assumed to be unbounded.
+        method : str, optional
+            Choice of minimizer. See scipy.optimize.minimize for details.
+        options : dict, optional
+            Dictionary of options to pass to the minimizer.
 
         Returns
         -------
@@ -414,8 +454,9 @@ class Likelihood():
 
         # Run minimizer
         guess = [start_dict[key] for key in free]
-        fit = minimize(minfun, guess,bounds=bounds, method='L-BFGS-B',
-                       args=(self, data, start_dict.copy(), free))
+        fit = minimize(minfun, guess, bounds=bounds, 
+                       args=(self, data, start_dict.copy(), free),
+                       method=method, options=options)
         result = start_dict.copy()
         for (key,val) in zip(free,fit.x):
             result[key] = val
