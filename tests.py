@@ -631,8 +631,8 @@ class BpCovTest(unittest.TestCase):
         maplist = [map1, map2]
         bpcm = BpCov(maplist, 3)
         M = np.ones((3,3))
-        M = np.concat((M, 2*M, 4*M))
-        M = np.concat((M, 3*M, 9*M), axis=1)
+        M = np.concatenate((M, 2*M, 4*M))
+        M = np.concatenate((M, 3*M, 9*M), axis=1)
         bpcm.set(M)
 
         # Select bin 0 only.

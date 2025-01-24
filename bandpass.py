@@ -23,6 +23,11 @@ Some conventions followed here:
 
 import numpy as np
 
+# Using np.trapezoid because np.trapz has been deprecated.
+# But numpy versions < 2 don't have np.trapezoid. Fix this.
+if 'trapezoid' not in dir(np):
+    np.trapezoid = np.trapz
+
 # Convert from GHz to Hz
 GHz = 1e9
 # CMB temperature, in K (Fixsen, ApJ 707, 916, 2009)
