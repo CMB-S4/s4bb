@@ -127,6 +127,24 @@ class XSpec():
                 specstr.append('{} x {}'.format(self.maplist[m0], self.maplist[m1]))
         return specstr
 
+    def ensemble_average(self):
+        """
+        Returns a new XSpec object made by averaging over realizations.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        avg : XSpec
+            New XSpec object made by averaging the current object over the
+            realization axis (2).
+
+        """
+
+        return XSpec(self.maplist, self.bins, np.mean(self.spec, axis=2))
+    
     def select(self, maplist=None, ellind=None):
         """
         Make a new XSpec object with selected maps and/or ell bins.

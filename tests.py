@@ -159,6 +159,15 @@ class SpectraTest(unittest.TestCase):
         self.assertEqual(xspec6.nrlz(), xspec4.nrlz())
         self.assertTrue((xspec6[0,:,:] == xspec4[1,0:2,:]).all())
 
+    def test_XSpec_average(self):
+        # Make XSpec object with multiple realizations filled with
+        # random values.
+        nrlz = 100
+        values = np.random.randn(self.nspec, self.nbin, nrlz)
+        spec = XSpec(self.maps, self.bins, values)
+        np.testing.assert_allclose(spec.ensemble_average()[:,:,0],
+                                   np.mean(values, axis=2), atol=1e-15)
+        
     def test_XSpec_to_hdf5(self):
         # MapDef objects with bells and whistles
         m0 = MapDef('m0', 'E', bandpass=Bandpass.tophat(80, 100),
