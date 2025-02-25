@@ -288,8 +288,8 @@ class Likelihood():
         # Record fiducial model bandpowers in matrix form (include noise bias)
         self.fiducial['Cf'] = vecp_to_matrix(expv + self.bias[:,:,0])
         # Also, take the square root (cholesky decomposition) in each ell bin
-        self.fiducial['Cf12'] = np.permute_dims(np.linalg.cholesky(
-            np.permute_dims(self.fiducial['Cf'], (2,0,1))), (1,2,0))
+        self.fiducial['Cf12'] = np.transpose(np.linalg.cholesky(
+            np.transpose(self.fiducial['Cf'], (2,0,1))), (1,2,0))
         # Get bandpower covariance matrix.
         try:
             # BpCov_signoi
