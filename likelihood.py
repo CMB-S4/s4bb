@@ -301,7 +301,9 @@ class Likelihood():
                                  'Should use BpCov_signoi class instead')
             self.fiducial['M'] = self.bpcm.get(noffdiag=noffdiag)
         # Calculate inverse bandpower covariance matrix.
-        self.fiducial['Minv'] = np.linalg.inv(self.fiducial['M'])
+        # Using pseudo-inverse because this matrix is very large and often
+        # contains some very small singular values.
+        self.fiducial['Minv'] = np.linalg.pinv(self.fiducial['M'])
 
     def chi2(self, expv, data):
         """
